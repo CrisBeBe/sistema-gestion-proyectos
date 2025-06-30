@@ -23,6 +23,17 @@ interface ProjectViewProps {
   onBack: () => void;
 }
 
+/** el componente `ProjectView`, que muestra la vista detallada de un proyecto seleccionado. Este componente:
+
+- Recibe como props el `projectId` y un callback `onBack` para volver a la vista anterior.
+- Obtiene datos del proyecto, tareas y miembros del contexto de aplicación.
+- Filtra y clasifica tareas por estado (pendiente, en progreso, completada).
+- Si el usuario es el propietario, muestra opciones para invitar miembros y crear tareas.
+- Muestra estadísticas generales del proyecto (miembros, tareas, progreso) y organiza las tareas en un tablero o lista mediante pestañas (`Tabs`).
+- En la pestaña de miembros, muestra un listado de los colaboradores del proyecto.
+- Utiliza estados locales para manejar la carga de datos y los miembros del proyecto.
+- Emplea componentes de UI para estructurar visualmente la información y la interacción del usuario con el proyecto.
+ */
 export function ProjectView({ projectId, onBack }: ProjectViewProps) {
   const { user, token } = useAuth();
   const { projects, tasks } = useApp();

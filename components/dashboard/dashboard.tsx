@@ -25,6 +25,23 @@ import { useEffect, useState } from "react";
 
 type View = "dashboard" | "projects" | "tasks" | "project-detail";
 
+/**
+ Elcomponente `Dashboard` en React que funciona como la vista principal de la aplicación "StudyCollab". Este componente:
+
+* Administra la vista actual (`dashboard`, `projects`, `tasks`, o `project-detail`) y el proyecto seleccionado mediante estados locales.
+* Obtiene información de usuario, autenticación y datos de proyectos, tareas e invitaciones desde contextos de aplicación.
+* Calcula estadísticas de proyectos y tareas (pendientes, completadas, vencidas).
+* Incluye un efecto que muestra un diálogo de confirmación cuando el usuario recibe una invitación a un proyecto y responde automáticamente.
+* Renderiza una barra lateral de navegación con botones para cambiar la vista y muestra la información del usuario actual y un botón para cerrar sesión.
+* Muestra, según la vista seleccionada, un resumen de métricas, lista de proyectos recientes, tareas próximas o componentes dedicados para gestión de proyectos y tareas.
+* Utiliza componentes de UI como `Card`, `Button` y diversos íconos para organizar visualmente la información y las acciones.
+
+El objetivo es proveer una interfaz integral para gestionar proyectos y tareas colaborativas dentro de la plataforma.
+
+
+*/ 
+
+
 export function Dashboard() {
   const [currentView, setCurrentView] = useState<View>("dashboard");
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(

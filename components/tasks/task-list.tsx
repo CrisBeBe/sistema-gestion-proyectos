@@ -6,6 +6,17 @@ import { useAuth } from "@/contexts/auth-context";
 import { CheckSquare } from "lucide-react";
 import { TaskCard } from "./task-card";
 
+/**  
+ * Componente `TaskList` que muestra y organiza todas las tareas del usuario en pestañas.
+* Divide las tareas en cuatro categorías: todas, por hacer, en progreso y completadas.
+* Usa el componente `Tabs` para navegar entre las categorías de tareas.
+* Muestra la cantidad de tareas en cada pestaña.
+* Renderiza cada tarea usando el componente `TaskCard`.
+* Si no hay tareas en una categoría, muestra un mensaje de estado con íconos y texto informativo.
+* Obtiene datos de tareas y proyectos desde el contexto global de la aplicación.
+* Presenta encabezado con título y descripción de la sección de tareas.
+
+ */
 export function TaskList() {
   const { user } = useAuth();
   const { tasks, projects } = useApp();

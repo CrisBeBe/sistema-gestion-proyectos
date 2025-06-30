@@ -18,6 +18,18 @@ import { useToast } from "@/hooks/use-toast";
 import { GraduationCap } from "lucide-react";
 import { useState } from "react";
 
+/** 
+El componente `LoginForm` en React que proporciona una interfaz de usuario para iniciar sesión y registrarse en la aplicación "StudyCollab". El componente:
+
+* Importa componentes de UI y hooks de contexto para manejar autenticación y notificaciones.
+* Gestiona el estado de los formularios de inicio de sesión y registro con `useState`.
+* Define funciones `handleLogin` y `handleRegister` que se ejecutan al enviar cada formulario, realizando llamadas a métodos `login` y `register` obtenidos desde el contexto de autenticación.
+* Muestra notificaciones según el resultado de las operaciones de autenticación.
+* Renderiza un formulario con pestañas (usando el componente `Tabs`) para alternar entre el inicio de sesión y el registro, cada uno con sus respectivos campos y botones.
+* Muestra un ícono y el nombre de la aplicación en la parte superior de la interfaz.
+
+El propósito del componente es permitir a los usuarios registrarse y autenticar sus credenciales para acceder al sistema de gestión colaborativa de proyectos estudiantiles.
+*/ 
 export function LoginForm() {
   const [loginData, setLoginData] = useState({ email: "", password: "" });
   const [registerData, setRegisterData] = useState({

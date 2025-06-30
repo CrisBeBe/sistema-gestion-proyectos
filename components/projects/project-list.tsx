@@ -30,6 +30,18 @@ interface ProjectListProps {
   onProjectSelect: (projectId: number) => void;
 }
 
+/**  
+  el componente `ProjectList`, que muestra la lista de proyectos del usuario dentro de la aplicación. Este componente:
+
+- Recibe una función `onProjectSelect` para manejar la selección de un proyecto.
+- Obtiene datos de proyectos, el usuario actual y métodos del contexto de aplicación.
+- Muestra cada proyecto en una tarjeta (`Card`) con información como título, descripción, fechas de creación y actualización, y un distintivo que indica si el usuario es propietario o colaborador.
+- Incluye un menú desplegable en cada proyecto con opciones para ver o eliminar el proyecto (esta última solo disponible para el propietario).
+- Utiliza el componente `CreateProjectDialog` para permitir crear nuevos proyectos.
+- Si no hay proyectos, muestra un mensaje informativo y un botón para crear un proyecto.
+
+Su propósito es proporcionar una vista interactiva para gestionar y visualizar los proyectos existentes del usuario.
+*/
 export function ProjectList({ onProjectSelect }: ProjectListProps) {
   const { user, token } = useAuth();
   const { projects, deleteProject } = useApp();

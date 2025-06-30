@@ -22,6 +22,18 @@ interface InviteMemberDialogProps {
   projectId: number;
 }
 
+/**
+ 
+El componente `CreateProjectDialog` que muestra un diálogo modal para crear un nuevo proyecto en la aplicación. Utiliza estados locales para controlar la apertura del diálogo, los valores del título y descripción del proyecto, y el estado de carga. Al enviar el formulario:
+
+* Llama a la función `createProject` desde el contexto de aplicación para crear el proyecto.
+* Muestra notificaciones de éxito o error usando el hook `useToast`.
+* Reinicia los campos del formulario y cierra el diálogo al éxito.
+* El componente utiliza botones y campos de entrada personalizados para construir el formulario y la interfaz del diálogo.
+
+Su propósito es proporcionar una interfaz para que los usuarios creen nuevos proyectos colaborativos fácilmente.
+
+ */
 export function InviteMemberDialog({ projectId }: InviteMemberDialogProps) {
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");

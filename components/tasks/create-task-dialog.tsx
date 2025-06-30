@@ -34,6 +34,19 @@ interface CreateTaskDialogProps {
   projectId: number;
 }
 
+/**   
+ * Componente `CreateTaskDialog` que permite crear una nueva tarea en un proyecto.
+* Usa estados locales para manejar título, descripción, prioridad, fecha límite, miembros asignados y estado de carga.
+* Muestra un formulario dentro de un diálogo modal para ingresar los datos de la tarea.
+* Al enviar el formulario, llama a `createTask` del contexto de la app para guardar la tarea.
+* Muestra notificaciones de éxito o error usando `toast`.
+* Permite asignar la tarea a miembros del proyecto mediante checkboxes.
+* Si no se asigna a nadie, la tarea se asigna automáticamente al usuario actual.
+* Incluye campos de prioridad con opciones baja, media y alta.
+* Contiene botones para cancelar o crear la tarea.
+
+*/
+
 export function CreateTaskDialog({ projectId }: CreateTaskDialogProps) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");

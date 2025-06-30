@@ -16,6 +16,17 @@ interface TaskCardProps {
   showProject?: boolean;
 }
 
+/**  
+ ** Componente `TaskCard` que muestra la información de una tarea en forma de tarjeta interactiva.
+* Muestra título, descripción, prioridad, estado, fecha límite y número de comentarios de la tarea.
+* Cambia el color de la tarjeta si la tarea está vencida y no completada.
+* Permite cambiar el estado de la tarea (pendiente, en progreso, completada) si el usuario está asignado.
+* Abre un diálogo con detalles de la tarea al hacer clic en el encabezado.
+* Carga los comentarios de la tarea desde la API al montar el componente.
+* Utiliza badges de colores para mostrar visualmente la prioridad y el estado de la tarea.
+* Usa hooks de contexto para acceder a datos globales de la app, autenticación y actualización de tareas.
+
+ */
 export function TaskCard({ task, showProject = false }: TaskCardProps) {
   const [showDetail, setShowDetail] = useState(false);
   const { projects, updateTask } = useApp();

@@ -28,6 +28,20 @@ interface TaskDetailDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
+/**  
+ * Componente `TaskDetailDialog` que muestra un diálogo modal con los detalles de una tarea.
+* Presenta título, descripción, proyecto al que pertenece, prioridad, estado y fecha límite de la tarea.
+* Permite al creador del proyecto eliminar la tarea desde el diálogo.
+* Muestra los usuarios asignados a la tarea con badges de nombre.
+* Permite al usuario asignado cambiar el estado de la tarea.
+* Incluye sección para agregar comentarios a la tarea, enviarlos y listarlos.
+* Usa estados locales para manejar comentarios, carga y nuevo comentario.
+* Carga los comentarios desde la API al abrir el diálogo.
+* Muestra notificaciones de éxito o error al agregar comentario o actualizar estado.
+* Utiliza badges de colores para indicar prioridad, estado y si la tarea está vencida.
+
+ */
+
 export function TaskDetailDialog({
   task,
   open,
