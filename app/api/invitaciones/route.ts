@@ -5,6 +5,8 @@ import {
   createResponse,
 } from "@/lib/middleware";
 import { NextRequest } from "next/server";
+import type { Invitation, InvitationExtended, User, Project } from "@/types";   
+
 
 export async function GET(req: NextRequest) {
   try {
