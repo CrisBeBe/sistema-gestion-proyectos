@@ -3,6 +3,7 @@ import { db } from "@/lib/database"
 import { verifyToken } from "@/lib/jwt"
 import { ok, err, internalServerError } from "@/lib/utils"
 import type { ProjectMember } from "@/types"
+import { getTokenFromHeader } from "@/lib/auth"
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
