@@ -1,46 +1,51 @@
-import { generateToken, hashPassword } from "@/lib/auth";
-import db from "@/lib/database";
-import { createErrorResponse, createResponse } from "@/lib/middleware";
-import { NextRequest } from "next/server";
+import { type NextRequest, NextResponse } from "next/server"
+import bcrypt from "bcryptjs"
+import { db } from "@/lib/database"
+import { ok, err, internalServerError } from "@/lib/utils"
+import { generateToken } from "@/lib/auth"
+import { APIResponse, UserPayload } from "@/types"
 
-export async function POST(req: NextRequest) {
+export interface RegisterResponse {
+  user: UserPayload;
+  token: string;
+}
+
+export async function POST(request: NextRequest): APIResponse<RegisterResponse> {
   try {
-    const { nombre, email, password } = await req.json();
+    const { nombre, email, password } = await request.json()
 
     if (!nombre || !email || !password) {
-      return createErrorResponse("Todos los campos son requeridos", 400);
+      return err("Todos los campos son requeridos", 400)
     }
 
-    // Verificar si el email ya existe
-    const [existingUser] = await db.execute(
-      "SELECT id FROM usuarios WHERE email = ?",
-      [email]
-    );
-
-    if ((existingUser as any[]).length > 0) {
-      return createErrorResponse("El email ya está registrado", 409);
+    if (password.length < 6) {
+      return err("La contraseña debe tener al menos 6 caracteres", 400)
     }
 
-    // Crear usuario
-    const passwordHash = await hashPassword(password);
-    const [result] = await db.execute(
-      "INSERT INTO usuarios (nombre, email, password_hash) VALUES (?, ?, ?)",
-      [nombre, email, passwordHash]
-    );
+    // Check if user already exists
+    const [existingUsers] = await db.execute("SELECT id FROM usuarios WHERE email = ?", [email])
 
-    const userId = (result as any).insertId;
-    const token = generateToken({ id: userId, email, nombre });
+    if ((existingUsers as any[]).length > 0) {
+      return err("El email ya está registrado", 409)
+    }
 
-    return createResponse(
-      {
-        message: "Usuario creado exitosamente",
-        usuario: { id: userId, nombre, email },
+    const hashedPassword = await bcrypt.hash(password, 10)
+
+    const [result] = await db.execute("INSERT INTO usuarios (nombre, email, password) VALUES (?, ?, ?)", [
+      nombre,
+      email,
+      hashedPassword,
+    ])
+
+    const userId = (result as any).insertId
+    const token = generateToken({ id: userId, email, nombre })
+
+    return ok({
+        user: { id: userId, nombre, email },
         token,
-      },
-      201
-    );
+      })
   } catch (error) {
-    console.error("Error al registrar usuario:", error);
-    return createErrorResponse("Error interno del servidor", 500);
+    console.error("Error en registro:", error)
+    return internalServerError()
   }
 }

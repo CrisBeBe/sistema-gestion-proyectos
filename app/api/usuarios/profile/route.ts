@@ -1,67 +1,64 @@
-import db from "@/lib/database";
-import {
-  authenticateUser,
-  createErrorResponse,
-  createResponse,
-} from "@/lib/middleware";
-import { NextRequest } from "next/server";
+import { type NextRequest, NextResponse } from "next/server"
+import { db } from "@/lib/database"
+import { verifyToken } from "@/lib/jwt"
+import { ok, err, internalServerError } from "@/lib/utils"
+import type { User } from "@/types"
 
-export async function GET(req: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
-    const userId = authenticateUser(req);
-    if (!userId) {
-      return createErrorResponse("Token inválido o expirado", 401);
+    const token = getTokenFromHeader(request)
+    if (!token) {
+      return err("Token requerido", 401)
     }
 
-    const [users] = await db.execute(
-      "SELECT id, nombre, email, fecha_creacion FROM usuarios WHERE id = ?",
-      [userId]
-    );
+    const decoded = verifyToken(token)
+    if (!decoded) {
+      return err("Token inválido", 401)
+    }
 
-    const user = (users as any[])[0];
+    const [rows] = await db.execute("SELECT id, nombre, email, fecha_creacion, avatar FROM usuarios WHERE id = ?", [
+      decoded.id,
+    ])
+
+    const user = (rows as User[])[0]
     if (!user) {
-      return createErrorResponse("Usuario no encontrado", 404);
+      return err("Usuario no encontrado", 404)
     }
 
-    return createResponse({ usuario: user });
+    return NextResponse.json(ok(user))
   } catch (error) {
-    console.error("Error al obtener perfil:", error);
-    return createErrorResponse("Error interno del servidor", 500);
+    console.error("Error obteniendo perfil:", error)
+    return internalServerError()
   }
 }
 
-export async function PUT(req: NextRequest) {
+export async function PUT(request: NextRequest) {
   try {
-    const userId = authenticateUser(req);
-    if (!userId) {
-      return createErrorResponse("Token inválido o expirado", 401);
+    const token = getTokenFromHeader(request)
+    if (!token) {
+      return err("Token requerido", 401)
     }
 
-    const { nombre, email } = await req.json();
-
-    if (!nombre || !email) {
-      return createErrorResponse("Nombre y email son requeridos", 400);
+    const decoded = verifyToken(token)
+    if (!decoded) {
+      return err("Token inválido", 401)
     }
 
-    // Verificar si el email ya existe (excepto para el usuario actual)
-    const [existingUser] = await db.execute(
-      "SELECT id FROM usuarios WHERE email = ? AND id != ?",
-      [email, userId]
-    );
+    const { nombre, avatar } = await request.json()
 
-    if ((existingUser as any[]).length > 0) {
-      return createErrorResponse("El email ya está en uso", 409);
+    if (!nombre) {
+      return err("El nombre es requerido", 400)
     }
 
-    await db.execute("UPDATE usuarios SET nombre = ?, email = ? WHERE id = ?", [
+    await db.execute("UPDATE usuarios SET nombre = ?, avatar = ? WHERE id = ?", [
       nombre,
-      email,
-      userId,
-    ]);
+      avatar || null,
+      decoded.id,
+    ])
 
-    return createResponse({ message: "Perfil actualizado exitosamente" });
+    return NextResponse.json(ok({ message: "Perfil actualizado correctamente" }))
   } catch (error) {
-    console.error("Error al actualizar perfil:", error);
-    return createErrorResponse("Error interno del servidor", 500);
+    console.error("Error actualizando perfil:", error)
+    return internalServerError()
   }
 }

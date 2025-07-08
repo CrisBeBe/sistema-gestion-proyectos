@@ -1,118 +1,117 @@
-import db from "@/lib/database";
-import {
-  authenticateUser,
-  createErrorResponse,
-  createResponse,
-} from "@/lib/middleware";
-import { NextRequest } from "next/server";
+import { type NextRequest, NextResponse } from "next/server"
+import { db } from "@/lib/database"
+import { verifyToken } from "@/lib/jwt"
+import { ok, err, internalServerError } from "@/lib/utils"
+import type { Comment } from "@/types"
 
-export async function GET(req: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
-    const user = authenticateUser(req);
-
-    if (!user) {
-      return createErrorResponse("Token inválido o expirado", 401);
+    const token = getTokenFromHeader(request)
+    if (!token) {
+      return err("Token requerido", 401)
     }
 
-    const { searchParams } = new URL(req.url);
-    const tareaId = searchParams.get("id_tarea");
+    const decoded = verifyToken(token)
+    if (!decoded) {
+      return err("Token inválido", 401)
+    }
+
+    const url = new URL(request.url)
+    const tareaId = url.searchParams.get("tarea_id")
 
     if (!tareaId) {
-      return createErrorResponse("id_tarea es requerido", 400);
+      return err("ID de la tarea requerido", 400)
     }
 
-    // Verificar acceso a la tarea
-    const [access] = await db.execute(
+    // Check if user has access to this task
+    const [accessCheck] = await db.execute(
       `
+      SELECT 1 FROM tarea_asignaciones ta
+      WHERE ta.tarea_id = ? AND ta.usuario_id = ?
+      UNION
       SELECT 1 FROM tareas t
-      LEFT JOIN proyectos p ON t.proyecto_id = p.id
-      LEFT JOIN usuario_proyecto up ON p.id = up.proyecto_id
-      WHERE t.id = ? AND (p.creador_id = ? OR up.usuario_id = ?)
+      JOIN proyectos p ON t.proyecto_id = p.id
+      WHERE t.id = ? AND p.creador_id = ?
     `,
-      [tareaId, user.id, user.id]
-    );
+      [tareaId, decoded.id, tareaId, decoded.id],
+    )
 
-    if ((access as any[]).length === 0) {
-      return createErrorResponse("No tienes acceso a esta tarea", 403);
+    if ((accessCheck as any[]).length === 0) {
+      return err("No tienes acceso a esta tarea", 403)
     }
 
-    const [resultado] = await db.execute(
+    const [rows] = await db.execute(
       `
-      SELECT *
+      SELECT c.*, u.nombre as usuario_nombre
       FROM comentarios c
+      JOIN usuarios u ON c.usuario_id = u.id
       WHERE c.tarea_id = ?
       ORDER BY c.fecha_creacion ASC
     `,
-      [tareaId]
-    );
+      [tareaId],
+    )
 
-    const comentarios: Commentary[] = new Array();
-
-    for (let comment of resultado as Commentary[]) {
-      const [users] = await db.execute(
-        `
-        SELECT u.*
-        FROM comentarios c
-        LEFT JOIN usuarios u ON c.usuario_id = u.id
-        WHERE c.id = ?
-      `,
-        [comment.id]
-      );
-
-      comentarios.push({ ...comment, user: (users as any)[0] });
-    }
-
-    return createResponse(comentarios);
+    return NextResponse.json(ok(rows as Comment[]))
   } catch (error) {
-    console.error("Error al obtener comentarios:", error);
-    return createErrorResponse("Error interno del servidor", 500);
+    console.error("Error obteniendo comentarios:", error)
+    return internalServerError()
   }
 }
 
-export async function POST(req: NextRequest) {
+export async function POST(request: NextRequest) {
   try {
-    const user = authenticateUser(req);
-    if (!user) {
-      return createErrorResponse("Token inválido o expirado", 401);
+    const token = getTokenFromHeader(request)
+    if (!token) {
+      return err("Token requerido", 401)
     }
 
-    const { contenido, tarea_id } = await req.json();
+    const decoded = verifyToken(token)
+    if (!decoded) {
+      return err("Token inválido", 401)
+    }
+
+    const { contenido, tarea_id } = await request.json()
 
     if (!contenido || !tarea_id) {
-      return createErrorResponse("Contenido y tarea_id son requeridos", 400);
+      return err("Contenido y tarea son requeridos", 400)
     }
 
-    // Verificar acceso a la tarea
-    const [access] = await db.execute(
+    // Check if user has access to this task
+    const [accessCheck] = await db.execute(
       `
+      SELECT 1 FROM tarea_asignaciones ta
+      WHERE ta.tarea_id = ? AND ta.usuario_id = ?
+      UNION
       SELECT 1 FROM tareas t
-      LEFT JOIN proyectos p ON t.proyecto_id = p.id
-      LEFT JOIN usuario_proyecto up ON p.id = up.proyecto_id
-      WHERE t.id = ? AND (p.creador_id = ? OR up.usuario_id = ?)
+      JOIN proyectos p ON t.proyecto_id = p.id
+      WHERE t.id = ? AND p.creador_id = ?
     `,
-      [tarea_id, user.id, user.id]
-    );
+      [tarea_id, decoded.id, tarea_id, decoded.id],
+    )
 
-    if ((access as any[]).length === 0) {
-      return createErrorResponse("No tienes acceso a esta tarea", 403);
+    if ((accessCheck as any[]).length === 0) {
+      return err("No tienes acceso a esta tarea", 403)
     }
 
-    const [result] = await db.execute(
-      "INSERT INTO comentarios (contenido, usuario_id, tarea_id) VALUES (?, ?, ?)",
-      [contenido, user.id, tarea_id]
-    );
+    const [result] = await db.execute("INSERT INTO comentarios (contenido, tarea_id, usuario_id) VALUES (?, ?, ?)", [
+      contenido,
+      tarea_id,
+      decoded.id,
+    ])
 
-    const insertID = (result as any).insertId;
+    const commentId = (result as any).insertId
 
-    const [comentarioCreado] = await db.execute(
-      "select * from comentarios where id=?",
-      [insertID]
-    );
-    const comentario = (comentarioCreado as Commentary[])[0];
-
-    return createResponse({ ...comentario, user });
+    return NextResponse.json(
+      ok({
+        id: commentId,
+        contenido,
+        tarea_id,
+        usuario_id: decoded.id,
+      }),
+      { status: 201 },
+    )
   } catch (error) {
-    console.error("Error al crear comentario:", error);
-    return createErrorResponse("Error interno del servidor", 500);
+    console.error("Error creando comentario:", error)
+    return internalServerError()
   }
 }

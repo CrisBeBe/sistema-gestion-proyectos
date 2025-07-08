@@ -18,6 +18,7 @@ import {
 import { useApp } from "@/contexts/app-context";
 import { useAuth } from "@/contexts/auth-context";
 import {
+  CalendarClock,
   Calendar,
   CheckCircleIcon,
   FolderOpen,
@@ -52,7 +53,7 @@ Su propósito es proporcionar una vista interactiva para gestionar y visualizar 
 */
 export function ProjectList({ onProjectSelect }: ProjectListProps) {
   const { user, token } = useAuth();
-  const { projects, deleteProject } = useApp();
+  const { projects, deleteProject, createProject } = useApp();
 
   const handleDelete = async (projectId: number) => {
     if (confirm("¿Estás seguro de que quieres eliminar este proyecto?")) {
@@ -97,7 +98,7 @@ export function ProjectList({ onProjectSelect }: ProjectListProps) {
               <div className="flex items-center space-x-2">
                 <Crown className="h-5 w-5 text-yellow-300" />
                 <span className="text-blue-100 font-medium">
-                  {projects.filter(p => p.creador_id === user?.id).length} Propios
+                  {projects.length} Propios
                 </span>
               </div>
               <div className="flex items-center space-x-2">
@@ -108,11 +109,11 @@ export function ProjectList({ onProjectSelect }: ProjectListProps) {
               </div>
             </div>
           </div>
-          <CreateProjectDialog />
+          <CreateProjectDialog createProject={createProject}/>
         </div>
       </div>
 
-      {/* Grid de proyectos mejorado */}
+      {/* Grid de proyectos */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {projects.map((project) => (
           <Card 
@@ -133,7 +134,7 @@ export function ProjectList({ onProjectSelect }: ProjectListProps) {
                     </div>
                     <div className="flex-1">
                       <CardTitle className="text-lg font-bold text-slate-900 group-hover:text-blue-700 transition-colors">
-                        {project.titulo}
+                        {project.nombre}
                       </CardTitle>
                       <Badge
                         className={`mt-1 ${
@@ -199,16 +200,12 @@ export function ProjectList({ onProjectSelect }: ProjectListProps) {
               <div className="grid grid-cols-1 gap-3">
                 <div className="flex items-center gap-3 p-3 bg-green-50 rounded-xl">
                   <div className="h-8 w-8 bg-green-100 rounded-lg flex items-center justify-center">
-                    <CheckCircleIcon className="h-4 w-4 text-green-600" />
+                    <CalendarClock className="h-4 w-4 text-green-600" />
                   </div>
                   <div>
-                    <div className="text-sm font-medium text-slate-900">Última Actualización</div>
+                    <div className="text-sm font-medium text-slate-900">Fecha límite</div>
                     <div className="text-xs text-slate-600">
-                      {new Date(project.fecha_actualizacion).toLocaleDateString('es-ES', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                      })}
+                      {new Date(project.fecha_limite!).toLocaleString()}
                     </div>
                   </div>
                 </div>
@@ -220,11 +217,7 @@ export function ProjectList({ onProjectSelect }: ProjectListProps) {
                   <div>
                     <div className="text-sm font-medium text-slate-900">Fecha de Creación</div>
                     <div className="text-xs text-slate-600">
-                      {new Date(project.fecha_creacion).toLocaleDateString('es-ES', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                      })}
+                      {new Date(project.fecha_creacion).toLocaleString()}
                     </div>
                   </div>
                 </div>
@@ -294,7 +287,7 @@ export function ProjectList({ onProjectSelect }: ProjectListProps) {
             </div>
 
             <div className="flex justify-center">
-              <CreateProjectDialog />
+              <CreateProjectDialog createProject={createProject}/>
             </div>
 
             {/* Mensaje motivacional */}

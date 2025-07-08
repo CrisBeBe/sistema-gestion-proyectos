@@ -1,12 +1,14 @@
 "use client";
 
-import { User } from "@/types";
+import { LoginResponse } from "@/app/api/auth/login/route";
+import { RegisterResponse } from "@/app/api/auth/register/route";
+import { Response, User, UserPayload } from "@/types";
 import { useRouter } from "next/navigation";
 import type React from "react";
 import { createContext, useContext, useEffect, useState } from "react";
 
 interface AuthContextType {
-  user: User | null;
+  user: UserPayload | null;
   login: (email: string, password: string) => Promise<boolean>;
   register: (name: string, email: string, password: string) => Promise<boolean>;
   logout: () => void;
@@ -17,7 +19,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<UserPayload | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
@@ -40,15 +42,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
+      const result: Response<LoginResponse> = await response.json();
 
-      if (response.ok) {
-        const data = await response.json();
+      if (response.ok && result.success && result.data) {
 
-        localStorage.setItem("token", data.token);
-        localStorage.setItem("user", JSON.stringify(data.usuario));
+        localStorage.setItem("token", result.data.token);
+        localStorage.setItem("user", JSON.stringify(result.data.user));
 
-        setUser(data.usuario);
-        setToken(data.token);
+        setUser(result.data.user);
+        setToken(result.data.token);
         return true;
       }
       return false;
@@ -69,12 +71,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ nombre, email, password }),
       });
+      const result: Response<RegisterResponse> = await response.json();
 
-      if (response.ok) {
-        const data = await response.json();
-        localStorage.setItem("token", data.token);
-        localStorage.setItem("user", JSON.stringify(data.usuario));
-        setUser(data.usuario);
+      if (response.ok && result.success && result.data) {
+        localStorage.setItem("token", result.data.token);
+        localStorage.setItem("user", JSON.stringify(result.data.user));
+        setUser(result.data.user);
 
         return true;
       }

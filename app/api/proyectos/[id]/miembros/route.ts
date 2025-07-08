@@ -1,105 +1,51 @@
-import db from "@/lib/database";
-import {
-  authenticateUser,
-  createErrorResponse,
-  createResponse,
-} from "@/lib/middleware";
-import { NextRequest } from "next/server";
+import { type NextRequest, NextResponse } from "next/server"
+import { db } from "@/lib/database"
+import { verifyToken } from "@/lib/jwt"
+import { ok, err, internalServerError } from "@/lib/utils"
+import type { ProjectMember } from "@/types"
 
-interface Params {
-  params: Promise<{ id: string }>;
-}
-
-export async function GET(req: NextRequest, { params }: Params) {
-  const { id } = await params;
-
+export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const user = authenticateUser(req);
-
-    if (!user) {
-      return createErrorResponse("Token inválido o expirado", 401);
+    const token = getTokenFromHeader(request)
+    if (!token) {
+      return err("Token requerido", 401)
     }
 
-    const proyectoId = parseInt(id);
-
-    const [miembros] = await db.execute(
-      "SELECT u.* from usuarios u inner join usuario_proyecto up on up.usuario_id = u.id where up.proyecto_id = ? order by up.fecha_union ASC;",
-      [proyectoId]
-    );
-
-    return createResponse(miembros, 200);
-  } catch (error) {
-    console.error("Error al obtener miembros:", error);
-    return createErrorResponse("Error interno del servidor", 500);
-  }
-}
-
-export async function POST(req: NextRequest, { params }: Params) {
-  try {
-    const { id } = await params;
-    const user = authenticateUser(req);
-    if (!user) {
-      return createErrorResponse("Token inválido o expirado", 401);
+    const decoded = verifyToken(token)
+    if (!decoded) {
+      return err("Token inválido", 401)
     }
 
-    const proyectoId = parseInt(id);
-    const { email } = await req.json();
+    const projectId = Number.parseInt(params.id)
 
-    if (!email) {
-      return createErrorResponse("Email es requerido", 400);
-    }
-
-    // Verificar que el usuario es el creador del proyecto
-    const [access] = await db.execute(
+    // Check if user has access to this project
+    const [accessCheck] = await db.execute(
       `
       SELECT 1 FROM proyectos p
-      LEFT JOIN usuario_proyecto up ON p.id = up.proyecto_id
-      WHERE p.id = ? AND p.creador_id = ?;
+      LEFT JOIN proyecto_miembros pm ON p.id = pm.proyecto_id
+      WHERE p.id = ? AND (p.creador_id = ? OR pm.usuario_id = ?)
     `,
-      [proyectoId, user.id]
-    );
+      [projectId, decoded.id, decoded.id],
+    )
 
-    if ((access as any[]).length === 0) {
-      return createErrorResponse("No tienes acceso a este proyecto", 403);
+    if ((accessCheck as any[]).length === 0) {
+      return err("No tienes acceso a este proyecto", 403)
     }
 
-    // Buscar usuario por email
-    const [usuario] = await db.execute(
-      "SELECT id, nombre, email FROM usuarios WHERE email = ?",
-      [email]
-    );
+    const [rows] = await db.execute(
+      `
+      SELECT pm.*, u.nombre, u.email
+      FROM proyecto_miembros pm
+      JOIN usuarios u ON pm.usuario_id = u.id
+      WHERE pm.proyecto_id = ?
+      ORDER BY pm.fecha_union ASC
+    `,
+      [projectId],
+    )
 
-    if ((usuario as any[]).length === 0) {
-      return createErrorResponse("Usuario no encontrado", 404);
-    }
-
-    const nuevoMiembro = (usuario as User[])[0];
-
-    // Verificar si ya es miembro
-    const [existingMember] = await db.execute(
-      "SELECT 1 FROM usuario_proyecto WHERE usuario_id = ? AND proyecto_id = ?",
-      [nuevoMiembro.id, proyectoId]
-    );
-
-    if ((existingMember as any[]).length > 0) {
-      return createErrorResponse("El usuario ya es miembro del proyecto", 409);
-    }
-
-    // Agregar miembro
-    await db.execute(
-      "INSERT INTO usuario_proyecto (usuario_id, proyecto_id) VALUES (?, ?)",
-      [nuevoMiembro.id, proyectoId]
-    );
-
-    return createResponse(
-      {
-        message: "Miembro agregado exitosamente",
-        miembro: (usuario as any[])[0],
-      },
-      201
-    );
+    return NextResponse.json(ok(rows as ProjectMember[]))
   } catch (error) {
-    console.error("Error al agregar miembro:", error);
-    return createErrorResponse("Error interno del servidor", 500);
+    console.error("Error obteniendo miembros del proyecto:", error)
+    return internalServerError()
   }
 }

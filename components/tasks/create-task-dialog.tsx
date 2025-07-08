@@ -1,7 +1,8 @@
 "use client";
 
 import type React from "react";
-
+import {format} from "date-fns"
+import { es } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -26,12 +27,12 @@ import { useAuth } from "@/contexts/auth-context";
 import useProject from "@/hooks/use-project";
 import { useToast } from "@/hooks/use-toast";
 import { TaskPriority, User } from "@/types";
-
-
-
-import { Plus, CheckSquare, Clock, Users, AlertTriangle, Target, Calendar, Sparkles } from "lucide-react";
+import { FileText,CalendarIcon, X,  FileUp, Plus, CheckSquare, Clock, Users, AlertTriangle, Target, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { Checkbox } from "../ui/checkbox";
+import { Popover, PopoverTrigger, PopoverContent } from "../ui/popover";
+import { cn } from "@/lib/utils";
+import { Calendar } from "@/components/ui/calendar"
 
 interface CreateTaskDialogProps {
   projectId: number;
@@ -55,13 +56,15 @@ export function CreateTaskDialog({ projectId }: CreateTaskDialogProps) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<TaskPriority>("media");
-  const [dueDate, setDueDate] = useState("");
+  const [dueDate, setDueDate] = useState(new Date());
   const [loading, setLoading] = useState(false);
-  const { createTask } = useApp();
+  const { projects, createTask } = useApp();
   const { user } = useAuth();
   const { toast } = useToast();
-  const { members, project } = useProject(projectId);
   const [selectedMembers, setSelectedMembers] = useState<number[]>([]);
+  const [files, setFiles] = useState<File[]>([])
+
+  const project = projects.find(p => p.id === projectId)!
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,15 +74,14 @@ export function CreateTaskDialog({ projectId }: CreateTaskDialogProps) {
       await createTask(
         projectId,
         {
-          proyecto_id: projectId,
           titulo: title,
           descripcion: description,
           prioridad: priority,
-          estado: "pendiente",
-          fecha_limite: dueDate || null,
-          creador_id: (user as User).id,
+          fecha_limite: dueDate.toISOString(),
+          asignados: selectedMembers.length > 0 ? selectedMembers : [user!.id],
+          archivos: files
         },
-        selectedMembers.length > 0 ? selectedMembers : [(user as User).id]
+        
       );
 
       toast({
@@ -90,8 +92,9 @@ export function CreateTaskDialog({ projectId }: CreateTaskDialogProps) {
       setTitle("");
       setDescription("");
       setPriority("media");
-      setDueDate("");
+      setDueDate(new Date());
       setSelectedMembers([]);
+      setFiles([])
       setOpen(false);
     } catch (error) {
       toast({
@@ -168,7 +171,7 @@ export function CreateTaskDialog({ projectId }: CreateTaskDialogProps) {
           </div>
           <div className="flex items-center space-x-2 p-3 bg-blue-50 rounded-xl">
             <div className="h-8 w-8 bg-blue-100 rounded-lg flex items-center justify-center">
-              <Calendar className="h-4 w-4 text-blue-600" />
+              <CalendarIcon className="h-4 w-4 text-blue-600" />
             </div>
             <div>
               <div className="text-sm font-medium text-slate-900">Plazos</div>
@@ -251,63 +254,140 @@ export function CreateTaskDialog({ projectId }: CreateTaskDialogProps) {
               </Select>
             </div>
 
-            <div className="space-y-3">
-              <Label htmlFor="dueDate" className="text-sm font-semibold text-slate-700 flex items-center">
-                <Calendar className="h-4 w-4 mr-1 text-blue-600" />
-                Fecha Límite
-              </Label>
-              <Input
-                id="dueDate"
-                type="date"
-                value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
-                className="border-slate-300 focus:border-emerald-500 focus:ring-emerald-500 rounded-xl h-12"
-              />
+            <div className="space-y-2">
+              <Label>Fecha Límite</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn("w-full justify-start text-left font-normal", !dueDate && "text-muted-foreground")}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {dueDate ? format(dueDate, "PPP", { locale: es  }) : "Seleccionar fecha"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar mode="single" selected={dueDate} onSelect={setDueDate} initialFocus required/>
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
 
-          <div className="space-y-3">
-            <Label className="text-sm font-semibold text-slate-700 flex items-center">
-              <Users className="h-4 w-4 mr-1 text-purple-600" />
-              Asignar Miembros
-            </Label>
-            <div className="space-y-3 max-h-40 overflow-y-auto border border-slate-200 rounded-xl p-4 bg-slate-50">
-              {members.map((member) => (
-                <div key={member.id} className="flex items-center space-x-3 p-2 bg-white rounded-lg shadow-sm border border-slate-100">
-                  <Checkbox
-                    id={member.id.toString()}
-                    checked={selectedMembers.includes(member.id)}
-                    onCheckedChange={(checked) => {
-                      if (checked) {
-                        setSelectedMembers((prev) => [...prev, member.id]);
-                      } else {
-                        setSelectedMembers((prev) =>
-                          prev.filter((id) => id !== member.id)
-                        );
-                      }
-                    }}
-                    className="data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600"
-                  />
-                  <div className="flex-1">
-                    <Label htmlFor={member.id.toString()} className="text-sm font-medium text-slate-900 cursor-pointer">
-                      {member.nombre}
-                    </Label>
-                    {member.id === project?.creador_id && (
-                      <span className="ml-2 px-2 py-1 bg-gradient-to-r from-blue-100 to-purple-100 text-blue-700 text-xs rounded-full font-medium">
-                        Propietario
-                      </span>
-                    )}
+          {
+            project.miembros.length > 0 ? <div className="space-y-3">
+              <Label className="text-sm font-semibold text-slate-700 flex items-center">
+                <Users className="h-4 w-4 mr-1 text-purple-600" />
+                Asignar Miembros
+              </Label>
+              <div className="space-y-3 max-h-40 overflow-y-auto border border-slate-200 rounded-xl p-4 bg-slate-50">
+                <div key={project.creador.id} className="flex items-center space-x-3 p-2 bg-white rounded-lg shadow-sm border border-slate-100">
+                    <Checkbox
+                      id={project.creador.id.toString()}
+                      checked={selectedMembers.includes(project.creador.id)}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setSelectedMembers((prev) => [...prev, project.creador.id]);
+                        } else {
+                          setSelectedMembers((prev) =>
+                            prev.filter((id) => id !== project.creador.id)
+                          );
+                        }
+                      }}
+                      className="data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600"
+                    />
+                    <div className="flex-1">
+                      <Label htmlFor={project.creador.id.toString()} className="text-sm font-medium text-slate-900 cursor-pointer">
+                        {project.creador.nombre}
+                      </Label>
+                        <span className="ml-2 px-2 py-1 bg-gradient-to-r from-blue-100 to-purple-100 text-blue-700 text-xs rounded-full font-medium">
+                          Propietario
+                        </span>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-            <div className="p-3 bg-gradient-to-r from-emerald-50 to-teal-50 rounded-xl border border-emerald-200">
-              <p className="text-xs text-slate-700">
-                <strong className="text-emerald-700">Asignación inteligente:</strong> Si no seleccionas miembros específicos, 
-                la tarea se asignará automáticamente a ti para comenzar de inmediato.
-              </p>
-            </div>
+                {project.miembros.map((member) => (
+                  <div key={member.usuario_id} className="flex items-center space-x-3 p-2 bg-white rounded-lg shadow-sm border border-slate-100">
+                    <Checkbox
+                      id={member.usuario_id.toString()}
+                      checked={selectedMembers.includes(member.usuario_id)}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setSelectedMembers((prev) => [...prev, member.usuario_id]);
+                        } else {
+                          setSelectedMembers((prev) =>
+                            prev.filter((id) => id !== member.usuario_id)
+                          );
+                        }
+                      }}
+                      className="data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600"
+                    />
+                    <div className="flex-1">
+                      <Label htmlFor={member.usuario_id.toString()} className="text-sm font-medium text-slate-900 cursor-pointer">
+                        {member.usuario.nombre}
+                      </Label>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="p-3 bg-gradient-to-r from-emerald-50 to-teal-50 rounded-xl border border-emerald-200">
+                <p className="text-xs text-slate-700">
+                  <strong className="text-emerald-700">Asignación inteligente:</strong> Si no seleccionas miembros específicos,
+                  la tarea se asignará automáticamente a ti para comenzar de inmediato.
+                </p>
+              </div>
+            </div> : null
+          }
+
+          {/* Carga de Archivos */}
+          <div className="space-y-3">
+            <Label htmlFor="file-upload" className="text-sm font-semibold text-slate-700 flex items-center">
+              <FileUp className="h-4 w-4 mr-1 text-indigo-600" />
+              Archivos Adjuntos
+            </Label>
+            <Input
+              id="file-upload"
+              type="file"
+              multiple
+              accept="*/*"
+              onChange={(e) => {
+                if (e.target.files) {
+                  const selected = Array.from(e.target.files);
+
+                  setFiles((prev) => [...prev, ...selected]);
+                }
+              }}
+              className="border-slate-300 focus:border-emerald-500 focus:ring-emerald-500 rounded-xl h-12 bg-white file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-emerald-600 file:text-white hover:file:bg-emerald-700"
+            />
+            {files.length > 0 && (
+              <div className="space-y-2 max-h-40 overflow-y-auto border border-slate-200 rounded-xl p-4 bg-slate-50">
+                {files.map((file, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center justify-between bg-white border border-slate-100 rounded-lg px-3 py-2 shadow-sm"
+                  >
+                    <div className="flex items-center space-x-2 overflow-hidden">
+                      <FileText className="h-4 w-4 text-slate-500" />
+                      <span className="text-sm text-slate-700 truncate max-w-xs">{file.name}</span>
+                    </div>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      onClick={() =>
+                        setFiles((prev) => prev.filter((_, i) => i !== index))
+                      }
+                      className="text-red-500 hover:bg-red-50"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <p className="text-xs text-slate-500">
+              Puedes adjuntar archivos relevantes como documentos, imágenes o referencias técnicas.
+            </p>
           </div>
+
 
           {/* Vista previa de configuración */}
           <div className={`p-4 ${priorityConfig.bg} rounded-xl border-l-4 border-l-${priority === 'alta' ? 'red' : priority === 'media' ? 'yellow' : 'green'}-500`}>
@@ -321,7 +401,7 @@ export function CreateTaskDialog({ projectId }: CreateTaskDialogProps) {
                   </span>
                   {dueDate && (
                     <span className="ml-4 text-sm text-slate-600">
-                      • Vence: {new Date(dueDate).toLocaleDateString('es-ES')}
+                      • Vence: {new Date(dueDate).toLocaleString()}
                     </span>
                   )}
                 </div>

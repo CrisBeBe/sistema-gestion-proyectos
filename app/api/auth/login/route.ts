@@ -1,54 +1,49 @@
-import { comparePasswords, generateToken } from "@/lib/auth";
-import db from "@/lib/database";
-import { createErrorResponse, createResponse } from "@/lib/middleware";
-import { NextRequest } from "next/server";
+import { type NextRequest, NextResponse } from "next/server"
+import bcrypt from "bcryptjs"
+import { db } from "@/lib/database"
+import { ok, err, internalServerError } from "@/lib/utils"
+import type { APIResponse, User, UserPayload } from "@/types"
+import { generateToken } from "@/lib/auth"
 
-export async function POST(req: NextRequest) {
+export interface LoginResponse {
+  user: UserPayload
+  token: string
+}
+
+export async function POST(request: NextRequest): APIResponse<LoginResponse> {
   try {
-    const { email, password } = await req.json();
+    const { email, password } = await request.json()
 
     if (!email || !password) {
-      return createErrorResponse("Email y contraseña son requeridos", 400);
+      return err("Email y contraseña son requeridos", 400)
     }
 
-    // Buscar usuario
-    const [users] = await db.execute(
-      "SELECT id, nombre, email, password_hash FROM usuarios WHERE email = ?",
-      [email]
-    );
+    const [rows] = await db.execute("SELECT * FROM usuarios WHERE email = ?", [email])
 
-    const user = (users as any[])[0];
-    if (!user) {
-      return createErrorResponse("Credenciales inválidas", 401);
+    const users = rows as User[]
+    if (users.length === 0) {
+      return err("Credenciales inválidas", 401)
     }
 
-    // Verificar contraseña
-    const isValidPassword = await comparePasswords(
-      password,
-      user.password_hash
-    );
+    const user = users[0]
+    const isValidPassword = await bcrypt.compare(password, user.password!)
+
     if (!isValidPassword) {
-      return createErrorResponse("Credenciales inválidas", 401);
+      return err("Credenciales inválidas", 401)
     }
 
-    // Generar token
-    const token = generateToken({
-      id: user.id,
-      email: user.email,
-      nombre: user.nombre,
-    });
+    const token = generateToken({ id: user.id, email: user.email, nombre: user.nombre })
 
-    return createResponse({
-      message: "Login exitoso",
-      token,
-      usuario: {
-        id: user.id,
-        nombre: user.nombre,
-        email: user.email,
-      },
-    });
+    return ok({
+        user: {
+          id: user.id,
+          nombre: user.nombre,
+          email: user.email
+        },
+        token,
+      })
   } catch (error) {
-    console.error("Error al hacer login:", error);
-    return createErrorResponse("Error interno del servidor", 500);
+    console.error("Error en login:", error)
+    return internalServerError()
   }
 }

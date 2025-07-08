@@ -15,6 +15,8 @@ import { useApp } from "@/contexts/app-context";
 import { useAuth } from "@/contexts/auth-context";
 import { User } from "@/types";
 import { 
+  FileText,
+  CalendarClock,
   ArrowLeft, 
   CheckSquare, 
   Loader, 
@@ -30,7 +32,9 @@ import {
   Activity,
   Star,
   Shield,
-  Sparkles
+  Sparkles,
+  FileIcon, 
+  DownloadIcon
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { InviteMemberDialog } from "./invite-member-dialog";
@@ -53,14 +57,11 @@ interface ProjectViewProps {
  */
 export function ProjectView({ projectId, onBack }: ProjectViewProps) {
   const { user, token } = useAuth();
-  const { projects, tasks } = useApp();
-  const [loading, setLoading] = useState(true);
-  const [members, setMembers] = useState<User[]>([]);
-
-  console.log({ projectId });
+  const { projects, dowloadFile } = useApp();
 
   const project = projects.find((p) => p.id === projectId);
-  const projectTasks = tasks.filter((t) => t.proyecto_id === projectId);
+  const tasks = project!.tareas;
+  const members = project!.miembros;
 
   if (!project) {
     return (
@@ -85,26 +86,12 @@ export function ProjectView({ projectId, onBack }: ProjectViewProps) {
     );
   }
 
-  const todoTasks = projectTasks.filter((t) => t.estado === "pendiente");
-  const inProgressTasks = projectTasks.filter(
+  const todoTasks = tasks.filter((t) => t.estado === "pendiente");
+  const inProgressTasks = tasks.filter(
     (t) => t.estado === "en_progreso"
   );
-  const completedTasks = projectTasks.filter((t) => t.estado === "completada");
+  const completedTasks = tasks.filter((t) => t.estado === "completada");
   const isOwner = user && project && user.id === project.creador_id;
-
-  useEffect(() => {
-    const headers: any = {};
-
-    if (token) {
-      headers.authorization = `Bearer ${token}`;
-    }
-    fetch(`/api/proyectos/${projectId}/miembros`, { headers })
-      .then((res) => res.json())
-      .then((miembros) => {
-        setMembers(miembros);
-        setLoading(false);
-      });
-  }, [projectId]);
 
   return (
     <div className="space-y-8 pb-8">
@@ -127,7 +114,7 @@ export function ProjectView({ projectId, onBack }: ProjectViewProps) {
                 <Target className="h-6 w-6 text-white" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold">{project.titulo}</h1>
+                <h1 className="text-3xl font-bold">{project.nombre}</h1>
                 <p className="text-blue-100 text-lg">{project.descripcion}</p>
               </div>
             </div>
@@ -137,13 +124,13 @@ export function ProjectView({ projectId, onBack }: ProjectViewProps) {
               <div className="flex items-center space-x-2">
                 <Calendar className="h-4 w-4 text-blue-200" />
                 <span className="text-blue-100 text-sm">
-                  Creado el {new Date(project.fecha_creacion).toLocaleDateString('es-ES')}
+                  Creado el {new Date(project.fecha_creacion).toLocaleString()}
                 </span>
               </div>
               <div className="flex items-center space-x-2">
-                <Activity className="h-4 w-4 text-green-300" />
+                <CalendarClock className="h-4 w-4 text-green-300" />
                 <span className="text-blue-100 text-sm">
-                  Actualizado {new Date(project.fecha_actualizacion).toLocaleDateString('es-ES')}
+                  Fecha límite: {new Date(project.fecha_limite!).toLocaleString()}
                 </span>
               </div>
               <div className="flex items-center space-x-2">
@@ -204,9 +191,9 @@ export function ProjectView({ projectId, onBack }: ProjectViewProps) {
             </CardHeader>
             <CardContent>
               <div className="flex items-center justify-between">
-                <span className="text-3xl font-bold text-green-700">{projectTasks.length}</span>
+                <span className="text-3xl font-bold text-green-700">{tasks.length}</span>
                 <Badge className="bg-green-100 text-green-700 border-green-200 font-semibold">
-                  {projectTasks.length === 0 ? 'Nuevo' : 'Activo'}
+                  {tasks.length === 0 ? 'Nuevo' : 'Activo'}
                 </Badge>
               </div>
               <div className="text-xs text-slate-600 mt-2 space-y-1">
@@ -232,19 +219,19 @@ export function ProjectView({ projectId, onBack }: ProjectViewProps) {
             <CardContent>
               <div className="flex items-center justify-between">
                 <span className="text-3xl font-bold text-purple-700">
-                  {projectTasks.length > 0
-                    ? Math.round((completedTasks.length / projectTasks.length) * 100)
+                  {tasks.length > 0
+                    ? Math.round((completedTasks.length / tasks.length) * 100)
                     : 0}%
                 </span>
                 <Badge className="bg-purple-100 text-purple-700 border-purple-200 font-semibold">
-                  {completedTasks.length}/{projectTasks.length}
+                  {completedTasks.length}/{tasks.length}
                 </Badge>
               </div>
               <div className="w-full bg-purple-200 rounded-full h-2 mt-3">
                 <div 
                   className="bg-gradient-to-r from-purple-500 to-purple-600 h-2 rounded-full transition-all duration-500"
                   style={{
-                    width: `${projectTasks.length > 0 ? (completedTasks.length / projectTasks.length) * 100 : 0}%`
+                    width: `${tasks.length > 0 ? (completedTasks.length / tasks.length) * 100 : 0}%`
                   }}
                 ></div>
               </div>
@@ -253,10 +240,9 @@ export function ProjectView({ projectId, onBack }: ProjectViewProps) {
         </Card>
       </div>
 
-      {/* Tabs mejoradas */}
       <Tabs defaultValue="board" className="space-y-6">
         <div className="bg-white p-2 rounded-2xl shadow-lg border-0">
-          <TabsList className="grid w-full grid-cols-3 bg-slate-50 rounded-xl p-1">
+          <TabsList className="grid w-full grid-cols-4 bg-slate-50 rounded-xl p-1">
             <TabsTrigger 
               value="board" 
               className="rounded-lg font-semibold data-[state=active]:bg-white data-[state=active]:shadow-md transition-all"
@@ -278,6 +264,14 @@ export function ProjectView({ projectId, onBack }: ProjectViewProps) {
               <Users className="mr-2 h-4 w-4" />
               Equipo
             </TabsTrigger>
+            <TabsTrigger 
+              value="files"
+              className="rounded-lg font-semibold data-[state=active]:bg-white data-[state=active]:shadow-md transition-all"
+            >
+              <FileText className="mr-2 h-4 w-4" />
+              Archivos
+            </TabsTrigger>
+
           </TabsList>
         </div>
 
@@ -300,7 +294,7 @@ export function ProjectView({ projectId, onBack }: ProjectViewProps) {
               </div>
               <CardContent className="space-y-3 max-h-96 overflow-y-auto">
                 {todoTasks.map((task) => (
-                  <TaskCard key={task.id} task={task} />
+                  <TaskCard key={task.id} task_id={task.id} project_id={task.proyecto_id} />
                 ))}
                 {todoTasks.length === 0 && (
                   <div className="text-center py-8">
@@ -331,7 +325,7 @@ export function ProjectView({ projectId, onBack }: ProjectViewProps) {
               </div>
               <CardContent className="space-y-3 max-h-96 overflow-y-auto">
                 {inProgressTasks.map((task) => (
-                  <TaskCard key={task.id} task={task} />
+                  <TaskCard key={task.id} task_id={task.id} project_id={task.proyecto_id} />
                 ))}
                 {inProgressTasks.length === 0 && (
                   <div className="text-center py-8">
@@ -362,7 +356,7 @@ export function ProjectView({ projectId, onBack }: ProjectViewProps) {
               </div>
               <CardContent className="space-y-3 max-h-96 overflow-y-auto">
                 {completedTasks.map((task) => (
-                  <TaskCard key={task.id} task={task} />
+                  <TaskCard key={task.id} task_id={task.id} project_id={task.proyecto_id} />
                 ))}
                 {completedTasks.length === 0 && (
                   <div className="text-center py-8">
@@ -380,10 +374,10 @@ export function ProjectView({ projectId, onBack }: ProjectViewProps) {
 
         <TabsContent value="list" className="space-y-4">
           <div className="space-y-4">
-            {projectTasks.map((task) => (
-              <TaskCard key={task.id} task={task} showProject={false} />
+            {tasks.map((task) => (
+              <TaskCard key={task.id} task_id={task.id} project_id={task.proyecto_id} showProject={false} />
             ))}
-            {projectTasks.length === 0 && (
+            {tasks.length === 0 && (
               <Card className="border-0 shadow-2xl rounded-2xl overflow-hidden">
                 <div className="bg-gradient-to-r from-slate-50 to-blue-50 p-8">
                   <div className="text-center">
@@ -444,7 +438,7 @@ export function ProjectView({ projectId, onBack }: ProjectViewProps) {
                   <div>
                     <CardTitle className="text-2xl font-bold text-white">Equipo del Proyecto</CardTitle>
                     <CardDescription className="text-indigo-100 text-base">
-                      {members.length} {members.length === 1 ? 'miembro' : 'miembros'} colaborando en este proyecto
+                      {members.length + 1} {members.length === 0 ? 'miembro' : 'miembros'} colaborando en este proyecto
                     </CardDescription>
                   </div>
                 </div>
@@ -453,47 +447,44 @@ export function ProjectView({ projectId, onBack }: ProjectViewProps) {
             </div>
 
             <CardContent className="p-6">
-              {loading ? (
-                <div className="flex items-center justify-center py-12">
-                  <div className="text-center">
-                    <Loader className="animate-spin h-8 w-8 text-blue-600 mx-auto mb-4" />
-                    <p className="text-slate-600">Cargando miembros del equipo...</p>
-                  </div>
-                </div>
-              ) : (
+                {/* // <div className="flex items-center justify-center py-12">
+                //   <div className="text-center">
+                //     <Loader className="animate-spin h-8 w-8 text-blue-600 mx-auto mb-4" />
+                //     <p className="text-slate-600">Cargando miembros del equipo...</p>
+                //   </div>
+                // </div> */}
                 <div className="space-y-4">
                   {/* Propietario */}
-                  {members.length > 0 && (
+                  
                     <div className="flex items-center gap-4 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl border border-blue-100">
                       <div className="h-12 w-12 rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 flex items-center justify-center text-white font-bold text-lg">
-                        {members[0].nombre.charAt(0).toUpperCase()}
+                        {project.creador.nombre.charAt(0).toUpperCase()}
                       </div>
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
-                          <p className="font-bold text-slate-900">{members[0].nombre}</p>
+                          <p className="font-bold text-slate-900">{project.creador.nombre}</p>
                           <Crown className="h-4 w-4 text-yellow-500" />
                         </div>
-                        <p className="text-sm text-slate-600">{members[0].email}</p>
+                        <p className="text-sm text-slate-600">{project.creador.email}</p>
                       </div>
                       <Badge className="bg-gradient-to-r from-blue-100 to-purple-100 text-blue-700 border-blue-200 font-bold px-4 py-2 rounded-full">
                         <Crown className="h-3 w-3 mr-1" />
                         Propietario
                       </Badge>
                     </div>
-                  )}
-
+                  
                   {/* Miembros colaboradores */}
-                  {members.slice(1).map((member, index) => (
+                  {members.map((member, index) => (
                     <div
                       key={member.id}
                       className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-200 hover:shadow-md transition-shadow"
                     >
                       <div className="h-12 w-12 rounded-xl bg-gradient-to-r from-green-500 to-teal-500 flex items-center justify-center text-white font-bold text-lg">
-                        {member.nombre.charAt(0).toUpperCase()}
+                        {member.usuario.nombre.charAt(0).toUpperCase()}
                       </div>
                       <div className="flex-1">
-                        <p className="font-semibold text-slate-900">{member.nombre}</p>
-                        <p className="text-sm text-slate-600">{member.email}</p>
+                        <p className="font-semibold text-slate-900">{member.usuario.nombre}</p>
+                        <p className="text-sm text-slate-600">{member.usuario.email}</p>
                       </div>
                       <Badge className="bg-green-100 text-green-700 border-green-200 font-semibold px-4 py-2 rounded-full">
                         <UserCheck className="h-3 w-3 mr-1" />
@@ -503,7 +494,7 @@ export function ProjectView({ projectId, onBack }: ProjectViewProps) {
                   ))}
 
                   {/* Estado vacío para miembros */}
-                  {members.length <= 1 && (
+                  {members.length === 0 && (
                     <div className="text-center py-12">
                       <div className="h-16 w-16 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
                         <Plus className="h-8 w-8 text-blue-600" />
@@ -530,6 +521,56 @@ export function ProjectView({ projectId, onBack }: ProjectViewProps) {
                       )}
                     </div>
                   )}
+                </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="files" className="space-y-4">
+          <Card className="border-0 shadow-lg rounded-2xl overflow-hidden">
+            <CardHeader className="bg-gradient-to-r from-blue-600 to-purple-600 p-6">
+              <CardTitle className="text-xl font-bold text-white flex items-center gap-3">
+                <FileText className="h-6 w-6" />
+                Documentos Adjuntos
+              </CardTitle>
+              <CardDescription className="text-indigo-100">
+                Archivos compartidos por miembros en comentarios de tareas o documentos del proyecto.
+              </CardDescription>
+            </CardHeader>
+
+            <CardContent className="p-6 space-y-3">
+              {project.archivos && project.archivos.length > 0 ? (
+                <ul className="space-y-3">
+                  {project.archivos.map((file) => (
+                    <li
+                      key={file.id}
+                      className="flex items-center justify-between bg-gradient-to-r from-slate-50 to-gray-50 px-4 py-3 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow"
+                    >
+                      <div className="flex items-center gap-3 truncate">
+                        <FileIcon className="h-5 w-5 text-blue-600" />
+                        <span className="truncate max-w-[300px] text-sm font-medium text-slate-800">
+                          {file.nombre_original}
+                        </span>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-blue-600 hover:text-blue-800"
+                        onClick={() => dowloadFile(file.nombre_archivo, file.nombre_original)}
+                      >
+                        <DownloadIcon className="h-4 w-4 mr-1" />
+                        Descargar
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="text-center py-12">
+                  <div className="h-16 w-16 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                    <FileText className="h-8 w-8 text-blue-600" />
+                  </div>
+                  <h3 className="text-xl font-bold text-slate-900 mb-2">No hay archivos</h3>
+                  <p className="text-slate-600">Este proyecto aún no tiene documentos adjuntos</p>
                 </div>
               )}
             </CardContent>

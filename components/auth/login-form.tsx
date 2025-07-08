@@ -1,7 +1,6 @@
 "use client";
 
 import type React from "react";
-
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -13,8 +12,14 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useAuth } from "@/contexts/auth-context";
-import { useToast } from "@/hooks/use-toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { 
   GraduationCap, 
   Users, 
@@ -28,23 +33,20 @@ import {
   Globe,
   Star,
   ArrowRight,
-  Play
+  Play,
+  X,
+  Check,
+  Crown,
+  Mail,
+  Phone,
+  MapPin,
+  Clock
 } from "lucide-react";
 import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/auth-context";
 
-/** 
-El componente `LoginForm` en React que proporciona una interfaz de usuario para iniciar sesión y registrarse en la aplicación "StudyCollab". El componente:
-
-* Importa componentes de UI y hooks de contexto para manejar autenticación y notificaciones.
-* Gestiona el estado de los formularios de inicio de sesión y registro con `useState`.
-* Define funciones `handleLogin` y `handleRegister` que se ejecutan al enviar cada formulario, realizando llamadas a métodos `login` y `register` obtenidos desde el contexto de autenticación.
-* Muestra notificaciones según el resultado de las operaciones de autenticación.
-* Renderiza un formulario con pestañas (usando el componente `Tabs`) para alternar entre el inicio de sesión y el registro, cada uno con sus respectivos campos y botones.
-* Muestra un ícono y el nombre de la aplicación en la parte superior de la interfaz.
-
-El propósito del componente es permitir a los usuarios registrarse y autenticar sus credenciales para acceder al sistema de gestión colaborativa de proyectos estudiantiles.
-*/ 
-export function LoginForm() {
+export default function LoginForm() {
   const [loginData, setLoginData] = useState({ email: "", password: "" });
   const [registerData, setRegisterData] = useState({
     name: "",
@@ -52,9 +54,15 @@ export function LoginForm() {
     password: "",
   });
   const [loading, setLoading] = useState(false);
+  const [showDemo, setShowDemo] = useState(false);
+  const [showFeatures, setShowFeatures] = useState(false);
+  const [showPrivacy, setShowPrivacy] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
+
   const { login, register } = useAuth();
   const { toast } = useToast();
 
+  // Simulamos la función de autenticación
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -101,6 +109,14 @@ export function LoginForm() {
     }
 
     setLoading(false);
+
+  };
+
+  const handleForgotPassword = () => {
+    const email = prompt("Ingresa tu email para recuperar la contraseña:");
+    if (email) {
+      alert(`Se ha enviado un enlace de recuperación a ${email}`);
+    }
   };
 
   return (
@@ -119,15 +135,75 @@ export function LoginForm() {
               </div>
             </div>
             <div className="flex items-center space-x-4">
-              <Button variant="ghost" className="text-slate-600 hover:text-slate-900">
-                Características
-              </Button>
-              <Button variant="ghost" className="text-slate-600 hover:text-slate-900">
-                Precios
-              </Button>
-              <Button variant="ghost" className="text-slate-600 hover:text-slate-900">
-                Contacto
-              </Button>
+              <Dialog open={showFeatures} onOpenChange={setShowFeatures}>
+                <DialogTrigger asChild>
+                  <Button variant="ghost" className="text-slate-600 hover:text-slate-900">
+                    Características
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle className="text-2xl font-bold text-center">Características de StudyCollab</DialogTitle>
+                    <DialogDescription className="text-center">
+                      Descubre todas las herramientas que tenemos para ti
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="grid md:grid-cols-2 gap-6 mt-6">
+                    <div className="space-y-4">
+                      <div className="flex items-start space-x-3 p-4 bg-blue-50 rounded-lg">
+                        <Users className="h-6 w-6 text-blue-600 mt-1" />
+                        <div>
+                          <h3 className="font-semibold text-slate-900">Colaboración en Tiempo Real</h3>
+                          <p className="text-sm text-slate-600">Edita documentos simultáneamente con tu equipo, comparte pantalla y mantén videollamadas integradas.</p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-start space-x-3 p-4 bg-green-50 rounded-lg">
+                        <CheckSquare className="h-6 w-6 text-green-600 mt-1" />
+                        <div>
+                          <h3 className="font-semibold text-slate-900">Gestión Avanzada de Tareas</h3>
+                          <p className="text-sm text-slate-600">Kanban boards, diagramas de Gantt, asignación automática y seguimiento de progreso con IA.</p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-start space-x-3 p-4 bg-purple-50 rounded-lg">
+                        <Calendar className="h-6 w-6 text-purple-600 mt-1" />
+                        <div>
+                          <h3 className="font-semibold text-slate-900">Calendario Inteligente</h3>
+                          <p className="text-sm text-slate-600">Sincronización con Google Calendar, recordatorios automáticos y optimización de horarios de estudio.</p>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      <div className="flex items-start space-x-3 p-4 bg-orange-50 rounded-lg">
+                        <BarChart3 className="h-6 w-6 text-orange-600 mt-1" />
+                        <div>
+                          <h3 className="font-semibold text-slate-900">Analytics y Reportes</h3>
+                          <p className="text-sm text-slate-600">Métricas de productividad, análisis de tiempo invertido y reportes automáticos de progreso.</p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-start space-x-3 p-4 bg-indigo-50 rounded-lg">
+                        <MessageSquare className="h-6 w-6 text-indigo-600 mt-1" />
+                        <div>
+                          <h3 className="font-semibold text-slate-900">Comunicación Integrada</h3>
+                          <p className="text-sm text-slate-600">Chat grupal, foros de discusión, anotaciones en tiempo real y sistema de notificaciones inteligente.</p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-start space-x-3 p-4 bg-teal-50 rounded-lg">
+                        <Shield className="h-6 w-6 text-teal-600 mt-1" />
+                        <div>
+                          <h3 className="font-semibold text-slate-900">Seguridad Enterprise</h3>
+                          <p className="text-sm text-slate-600">Encriptación end-to-end, autenticación de dos factores y backups automáticos en la nube.</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+
             </div>
           </div>
         </div>
@@ -155,11 +231,57 @@ export function LoginForm() {
               </p>
 
               <div className="flex items-center space-x-4">
-                <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-8 py-3 rounded-xl font-semibold">
-                  <Play className="h-4 w-4 mr-2" />
-                  Ver Demo
-                </Button>
-                <Button variant="outline" className="px-8 py-3 rounded-xl font-semibold border-slate-300 hover:bg-slate-50">
+                <Dialog open={showDemo} onOpenChange={setShowDemo}>
+                  <DialogTrigger asChild>
+                    <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-8 py-3 rounded-xl font-semibold">
+                      <Play className="h-4 w-4 mr-2" />
+                      Ver Demo
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-4xl">
+                    <DialogHeader>
+                      <DialogTitle className="text-2xl font-bold text-center">Demo de StudyCollab</DialogTitle>
+                      <DialogDescription className="text-center">
+                        Descubre cómo StudyCollab puede transformar tu experiencia académica
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="mt-6 space-y-6">
+                      <div className="aspect-video rounded-lg overflow-hidden">
+                        <video
+                          controls
+                          className="w-full h-full object-cover rounded-lg"
+                          src="/demo.mp4"
+                        >
+                          Tu navegador no soporta la etiqueta de video.
+                        </video>
+                      </div>
+                      <div className="grid md:grid-cols-3 gap-4">
+                        <div className="text-center p-4 bg-slate-50 rounded-lg">
+                          <Users className="h-8 w-8 text-blue-600 mx-auto mb-2" />
+                          <h4 className="font-semibold">Colaboración</h4>
+                          <p className="text-sm text-slate-600">Ve cómo trabajar en equipo</p>
+                        </div>
+                        <div className="text-center p-4 bg-slate-50 rounded-lg">
+                          <CheckSquare className="h-8 w-8 text-green-600 mx-auto mb-2" />
+                          <h4 className="font-semibold">Gestión</h4>
+                          <p className="text-sm text-slate-600">Organiza tus proyectos</p>
+                        </div>
+                        <div className="text-center p-4 bg-slate-50 rounded-lg">
+                          <BarChart3 className="h-8 w-8 text-purple-600 mx-auto mb-2" />
+                          <h4 className="font-semibold">Análisis</h4>
+                          <p className="text-sm text-slate-600">Mide tu progreso</p>
+                        </div>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+
+
+                <Button 
+                  variant="outline" 
+                  className="px-8 py-3 rounded-xl font-semibold border-slate-300 hover:bg-slate-50"
+                  onClick={() => setShowFeatures(true)}
+                >
                   Más Información
                   <ArrowRight className="h-4 w-4 ml-2" />
                 </Button>
@@ -318,16 +440,7 @@ export function LoginForm() {
                             className="h-12 border-slate-300 focus:border-blue-500 focus:ring-blue-500"
                           />
                         </div>
-                        
-                        <div className="flex items-center justify-between text-sm">
-                          <label className="flex items-center">
-                            <input type="checkbox" className="mr-2 rounded border-slate-300" />
-                            <span className="text-slate-600">Recordarme</span>
-                          </label>
-                          <a href="#" className="text-blue-600 hover:text-blue-700 font-medium">
-                            ¿Olvidaste tu contraseña?
-                          </a>
-                        </div>
+                    
 
                         <Button 
                           type="submit" 
@@ -415,13 +528,21 @@ export function LoginForm() {
 
                         <div className="text-xs text-slate-600">
                           Al registrarte, aceptas nuestros{" "}
-                          <a href="#" className="text-blue-600 hover:text-blue-700">
+                          <button 
+                            type="button"
+                            onClick={() => setShowTerms(true)}
+                            className="text-blue-600 hover:text-blue-700 underline"
+                          >
                             Términos de Servicio
-                          </a>{" "}
+                          </button>{" "}
                           y{" "}
-                          <a href="#" className="text-blue-600 hover:text-blue-700">
+                          <button 
+                            type="button"
+                            onClick={() => setShowPrivacy(true)}
+                            className="text-blue-600 hover:text-blue-700 underline"
+                          >
                             Política de Privacidad
-                          </a>
+                          </button>
                           .
                         </div>
 
@@ -474,9 +595,19 @@ export function LoginForm() {
               <span className="font-semibold">StudyCollab</span>
             </div>
             <div className="flex items-center space-x-6 text-sm text-slate-400">
-              <a href="#" className="hover:text-white transition-colors">Privacidad</a>
-              <a href="#" className="hover:text-white transition-colors">Términos</a>
-              <a href="#" className="hover:text-white transition-colors">Soporte</a>
+              <button 
+                onClick={() => setShowPrivacy(true)}
+                className="hover:text-white transition-colors"
+              >
+                Privacidad
+              </button>
+              <button 
+                onClick={() => setShowTerms(true)}
+                className="hover:text-white transition-colors"
+              >
+                Términos
+              </button>
+              
               <div className="flex items-center space-x-1">
                 <Globe className="h-4 w-4" />
                 <span>Español</span>
@@ -485,6 +616,129 @@ export function LoginForm() {
           </div>
         </div>
       </footer>
+
+      {/* Modal de Privacidad */}
+      <Dialog open={showPrivacy} onOpenChange={setShowPrivacy}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold">Política de Privacidad</DialogTitle>
+            <DialogDescription>
+              Última actualización: Enero 2025
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-6 space-y-4 text-sm">
+            <div>
+              <h3 className="font-semibold text-lg mb-2">1. Información que Recopilamos</h3>
+              <p className="text-slate-600">
+                Recopilamos información que nos proporcionas directamente, como cuando creas una cuenta, 
+                utilizas nuestros servicios o te comunicas con nosotros. Esto incluye tu nombre, dirección 
+                de correo electrónico, información del perfil y contenido que creas o compartes.
+              </p>
+            </div>
+            
+            <div>
+              <h3 className="font-semibold text-lg mb-2">2. Cómo Utilizamos tu Información</h3>
+              <p className="text-slate-600">
+                Utilizamos la información recopilada para proporcionar, mantener y mejorar nuestros servicios, 
+                procesar transacciones, comunicarnos contigo y personalizar tu experiencia. También podemos 
+                usar la información para fines de seguridad y prevención de fraudes.
+              </p>
+            </div>
+
+            <div>
+              <h3 className="font-semibold text-lg mb-2">3. Compartir Información</h3>
+              <p className="text-slate-600">
+                No vendemos, intercambiamos ni transferimos tu información personal a terceros sin tu 
+                consentimiento, excepto en las circunstancias limitadas descritas en esta política, 
+                como cuando es necesario para proporcionar nuestros servicios o cumplir con obligaciones legales.
+              </p>
+            </div>
+
+            <div>
+              <h3 className="font-semibold text-lg mb-2">4. Seguridad de Datos</h3>
+              <p className="text-slate-600">
+                Implementamos medidas de seguridad técnicas, administrativas y físicas apropiadas para 
+                proteger tu información personal contra acceso no autorizado, alteración, divulgación o destrucción.
+              </p>
+            </div>
+
+            <div>
+              <h3 className="font-semibold text-lg mb-2">5. Tus Derechos</h3>
+              <p className="text-slate-600">
+                Tienes derecho a acceder, actualizar, corregir o eliminar tu información personal. 
+                También puedes optar por no recibir ciertas comunicaciones de nosotros. 
+                Para ejercer estos derechos, contáctanos en privacy@studycollab.com.
+              </p>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Términos */}
+      <Dialog open={showTerms} onOpenChange={setShowTerms}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold">Términos de Servicio</DialogTitle>
+            <DialogDescription>
+              Última actualización: Enero 2025
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-6 space-y-4 text-sm">
+            <div>
+              <h3 className="font-semibold text-lg mb-2">1. Aceptación de Términos</h3>
+              <p className="text-slate-600">
+                Al acceder y utilizar StudyCollab, aceptas estar sujeto a estos Términos de Servicio 
+                y todas las leyes y regulaciones aplicables. Si no estás de acuerdo con alguno de 
+                estos términos, no utilices nuestro servicio.
+              </p>
+            </div>
+            
+            <div>
+              <h3 className="font-semibold text-lg mb-2">2. Descripción del Servicio</h3>
+              <p className="text-slate-600">
+                StudyCollab es una plataforma de colaboración estudiantil que permite a los usuarios 
+                gestionar proyectos académicos, colaborar en tiempo real y organizar tareas educativas. 
+                Nos reservamos el derecho de modificar o discontinuar el servicio en cualquier momento.
+              </p>
+            </div>
+
+            <div>
+              <h3 className="font-semibold text-lg mb-2">3. Cuentas de Usuario</h3>
+              <p className="text-slate-600">
+                Para utilizar ciertas funciones del servicio, debes crear una cuenta. Eres responsable 
+                de mantener la confidencialidad de tu cuenta y contraseña, y de todas las actividades 
+                que ocurran bajo tu cuenta.
+              </p>
+            </div>
+
+            <div>
+              <h3 className="font-semibold text-lg mb-2">4. Uso Aceptable</h3>
+              <p className="text-slate-600">
+                Te comprometes a utilizar StudyCollab únicamente para fines legales y educativos. 
+                No puedes usar el servicio para actividades ilegales, dañinas o que violen los 
+                derechos de otros usuarios.
+              </p>
+            </div>
+
+            <div>
+              <h3 className="font-semibold text-lg mb-2">5. Propiedad Intelectual</h3>
+              <p className="text-slate-600">
+                El contenido, las características y la funcionalidad del servicio son propiedad de 
+                StudyCollab y están protegidos por derechos de autor, marcas comerciales y otras 
+                leyes de propiedad intelectual.
+              </p>
+            </div>
+
+            <div>
+              <h3 className="font-semibold text-lg mb-2">6. Limitación de Responsabilidad</h3>
+              <p className="text-slate-600">
+                StudyCollab no será responsable de ningún daño indirecto, incidental, especial o 
+                consecuente que resulte del uso o la imposibilidad de usar el servicio.
+              </p>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

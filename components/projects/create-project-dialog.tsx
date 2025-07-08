@@ -1,193 +1,202 @@
-"use client";
+"use client"
 
-import type React from "react";
+import type React from "react"
 
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { useApp } from "@/contexts/app-context";
-import { useToast } from "@/hooks/use-toast";
-import { Plus, Sparkles, Target, Users } from "lucide-react";
+import { useState } from "react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { Calendar } from "@/components/ui/calendar"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { CalendarIcon, Upload, X } from "lucide-react"
+import { format } from "date-fns"
+import { es } from "date-fns/locale"
+import { cn, formatFileSize, getFileIcon } from "@/lib/utils"
+import { useToast } from "@/hooks/use-toast"
+import { useAuth } from "@/contexts/auth-context"
 
-/**
- 
-El componente `CreateProjectDialog` que muestra un diálogo modal para crear un nuevo proyecto en la aplicación. Utiliza estados locales para controlar la apertura del diálogo, los valores del título y descripción del proyecto, y el estado de carga. Al enviar el formulario:
+interface CreateProjectDialogProps {
+  onProjectCreated?: () => void;
+  createProject: (name: string, description: string, due_date: Date, presupuesto: number, files: File[]) => void
+}
 
-* Llama a la función `createProject` desde el contexto de aplicación para crear el proyecto.
-* Muestra notificaciones de éxito o error usando el hook `useToast`.
-* Reinicia los campos del formulario y cierra el diálogo al éxito.
-* El componente utiliza botones y campos de entrada personalizados para construir el formulario y la interfaz del diálogo.
+export function CreateProjectDialog({ onProjectCreated, createProject }: CreateProjectDialogProps) {
+  const [open, setOpen] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [date, setDate] = useState<Date>()
+  const [files, setFiles] = useState<File[]>([])
+  const { toast } = useToast()
+  const { token } = useAuth()
 
-Su propósito es proporcionar una interfaz para que los usuarios creen nuevos proyectos colaborativos fácilmente.
+  const [formData, setFormData] = useState({
+    nombre: "",
+    descripcion: "",
+    presupuesto: "",
+  })
 
- */
-export function CreateProjectDialog() {
-  const [open, setOpen] = useState(false);
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [loading, setLoading] = useState(false);
-  const { createProject } = useApp();
-  const { toast } = useToast();
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFiles = Array.from(event.target.files || [])
+    setFiles((prev) => [...prev, ...selectedFiles])
+  }
+
+  const removeFile = (index: number) => {
+    setFiles((prev) => prev.filter((_, i) => i !== index))
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
+    e.preventDefault()
+    if (!formData.nombre.trim()) {
+      toast({
+        title: "Error",
+        description: "El nombre del proyecto es requerido",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setLoading(true)
 
     try {
-      await createProject(title, description);
+      // Create project
+      createProject(formData.nombre, formData.descripcion, date || new Date(), parseFloat(formData.presupuesto), files)
+
       toast({
-        title: "Proyecto creado",
-        description: "Tu proyecto ha sido creado exitosamente.",
-      });
-      setTitle("");
-      setDescription("");
-      setOpen(false);
+        title: "Éxito",
+        description: "Proyecto creado correctamente",
+      })
+
+      // Reset form
+      setFormData({ nombre: "", descripcion: "", presupuesto: "" })
+      setDate(undefined)
+      setFiles([])
+      setOpen(false)
+      onProjectCreated?.()
     } catch (error) {
       toast({
         title: "Error",
-        description: "No se pudo crear el proyecto.",
+        description: error instanceof Error ? error.message : "Error al crear el proyecto",
         variant: "destructive",
-      });
+      })
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold px-6 py-2.5 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200">
-          <Plus className="mr-2 h-4 w-4" />
-          Nuevo Proyecto
-          <Sparkles className="ml-2 h-4 w-4" />
-        </Button>
+        <Button>Crear Proyecto</Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[500px] bg-white rounded-2xl shadow-2xl border-0 max-h-[80vh] overflow-y-auto">
-        {/* Header con gradiente */}
-        <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-6 -m-6 mb-6">
-          <div className="flex items-center justify-center mb-3">
-            <div className="h-12 w-12 bg-white/20 rounded-xl flex items-center justify-center">
-              <Target className="h-6 w-6 text-white" />
-            </div>
-          </div>
-          <DialogHeader className="text-center">
-            <DialogTitle className="text-2xl font-bold text-white mb-2">
-              Crear Nuevo Proyecto
-            </DialogTitle>
-            <DialogDescription className="text-blue-100 text-base">
-              Inicia un nuevo proyecto colaborativo y alcanza tus objetivos académicos
-            </DialogDescription>
-          </DialogHeader>
-        </div>
-
-        {/* Indicadores de beneficios */}
-        <div className="grid grid-cols-2 gap-4 mb-6">
-          <div className="flex items-center space-x-2 p-3 bg-blue-50 rounded-xl">
-            <div className="h-8 w-8 bg-blue-100 rounded-lg flex items-center justify-center">
-              <Users className="h-4 w-4 text-blue-600" />
-            </div>
-            <div>
-              <div className="text-sm font-medium text-slate-900">Colaborativo</div>
-              <div className="text-xs text-slate-600">Invita a tu equipo</div>
-            </div>
-          </div>
-          <div className="flex items-center space-x-2 p-3 bg-purple-50 rounded-xl">
-            <div className="h-8 w-8 bg-purple-100 rounded-lg flex items-center justify-center">
-              <Target className="h-4 w-4 text-purple-600" />
-            </div>
-            <div>
-              <div className="text-sm font-medium text-slate-900">Organizado</div>
-              <div className="text-xs text-slate-600">Gestión inteligente</div>
-            </div>
-          </div>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="space-y-3">
-            <Label htmlFor="title" className="text-sm font-semibold text-slate-700 flex items-center">
-              Título del Proyecto
-              <span className="text-red-500 ml-1">*</span>
-            </Label>
+      <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Crear Nuevo Proyecto</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="nombre">Nombre del Proyecto *</Label>
             <Input
-              id="title"
-              placeholder="Ej: Proyecto de Investigación en IA"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              id="nombre"
+              value={formData.nombre}
+              onChange={(e) => setFormData((prev) => ({ ...prev, nombre: e.target.value }))}
+              placeholder="Ingresa el nombre del proyecto"
               required
-              className="h-12 border-slate-300 focus:border-blue-500 focus:ring-blue-500 rounded-xl text-base placeholder-slate-400"
             />
-            <p className="text-xs text-slate-500">
-              Elige un nombre descriptivo y atractivo para tu proyecto
-            </p>
           </div>
 
-          <div className="space-y-3">
-            <Label htmlFor="description" className="text-sm font-semibold text-slate-700 flex items-center">
-              Descripción
-              <span className="text-red-500 ml-1">*</span>
-            </Label>
+          <div className="space-y-2">
+            <Label htmlFor="descripcion">Descripción</Label>
             <Textarea
-              id="description"
-              placeholder="Describe los objetivos, metodología y resultados esperados de tu proyecto..."
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              required
-              rows={4}
-              className="border-slate-300 focus:border-blue-500 focus:ring-blue-500 rounded-xl text-base placeholder-slate-400 resize-none"
+              id="descripcion"
+              value={formData.descripcion}
+              onChange={(e) => setFormData((prev) => ({ ...prev, descripcion: e.target.value }))}
+              placeholder="Describe el proyecto..."
+              rows={3}
             />
-            <p className="text-xs text-slate-500">
-              Una descripción clara ayudará a atraer colaboradores ideales
-            </p>
           </div>
 
-          {/* Botones de acción */}
-          <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4 border-t border-slate-200">
-            <Button 
-              type="button" 
-              variant="outline" 
-              onClick={() => setOpen(false)}
-              className="px-8 py-3 rounded-xl font-semibold border-slate-300 hover:bg-slate-50 transition-colors"
-            >
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="presupuesto">Presupuesto</Label>
+              <Input
+                id="presupuesto"
+                type="number"
+                step="0.01"
+                min="0"
+                value={formData.presupuesto}
+                onChange={(e) => setFormData((prev) => ({ ...prev, presupuesto: e.target.value }))}
+                placeholder="0.00"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Fecha Límite</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn("w-full justify-start text-left font-normal", !date && "text-muted-foreground")}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {date ? format(date, "PPP", { locale: es }) : "Seleccionar fecha"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar mode="single" selected={date} onSelect={setDate} initialFocus />
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Archivos del Proyecto</Label>
+            <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+              <div className="text-center">
+                <Upload className="mx-auto h-8 w-8 text-gray-400" />
+                <div className="mt-2">
+                  <label htmlFor="file-upload" className="cursor-pointer">
+                    <span className="text-sm text-blue-600 hover:text-blue-500">Seleccionar archivos</span>
+                    <input id="file-upload" type="file" multiple className="hidden" onChange={handleFileSelect} />
+                  </label>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">Archivos que todos los miembros podrán ver</p>
+              </div>
+            </div>
+
+            {files.length > 0 && (
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Archivos seleccionados:</Label>
+                <div className="space-y-2 max-h-32 overflow-y-auto">
+                  {files.map((file, index) => (
+                    <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-lg">{getFileIcon(file.type)}</span>
+                        <div>
+                          <p className="text-sm font-medium truncate max-w-[200px]">{file.name}</p>
+                          <p className="text-xs text-gray-500">{formatFileSize(file.size)}</p>
+                        </div>
+                      </div>
+                      <Button type="button" variant="ghost" size="sm" onClick={() => removeFile(index)}>
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end space-x-2 pt-4">
+            <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={loading}>
               Cancelar
             </Button>
-            <Button 
-              type="submit" 
-              disabled={loading || !title.trim() || !description.trim()}
-              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold px-8 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? (
-                <div className="flex items-center">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Creando proyecto...
-                </div>
-              ) : (
-                <div className="flex items-center">
-                  <Target className="h-4 w-4 mr-2" />
-                  Crear Proyecto
-                </div>
-              )}
+            <Button type="submit" disabled={loading}>
+              {loading ? "Creando..." : "Crear Proyecto"}
             </Button>
           </div>
         </form>
-
-        {/* Mensaje de motivación */}
-        <div className="mt-4 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl border border-blue-200">
-          <p className="text-sm text-slate-700 text-center">
-            <strong className="text-blue-700">¡Tip profesional!</strong> Los proyectos con descripciones detalladas tienen un{" "}
-            <span className="text-purple-700 font-semibold">300% más</span> de probabilidad de encontrar colaboradores activos.
-          </p>
-        </div>
       </DialogContent>
     </Dialog>
-  );
+  )
 }

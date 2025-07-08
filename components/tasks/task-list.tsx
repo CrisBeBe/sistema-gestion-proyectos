@@ -29,8 +29,9 @@ import { TaskCard } from "./task-card";
  */
 export function TaskList() {
   const { user } = useAuth();
-  const { tasks, projects } = useApp();
+  const { projects } = useApp();
 
+  const tasks = projects.map(p => p.tareas).flat();
   const todoTasks = tasks.filter((t) => t.estado === "pendiente");
   const inProgressTasks = tasks.filter((t) => t.estado === "en_progreso");
   const completedTasks = tasks.filter((t) => t.estado === "completada");
@@ -135,7 +136,7 @@ export function TaskList() {
         {/* Contenido de todas las tareas */}
         <TabsContent value="all" className="space-y-4">
           {tasks.map((task) => (
-            <TaskCard key={task.id} task={task} showProject={true} />
+            <TaskCard key={task.id} task_id={task.id} project_id={task.proyecto_id} showProject={true} />
           ))}
           {tasks.length === 0 && (
             <Card className="border-0 shadow-xl rounded-2xl overflow-hidden">
@@ -171,7 +172,7 @@ export function TaskList() {
         {/* Contenido de tareas pendientes */}
         <TabsContent value="todo" className="space-y-4">
           {todoTasks.map((task) => (
-            <TaskCard key={task.id} task={task} showProject={true} />
+            <TaskCard key={task.id} task_id={task.id} project_id={task.proyecto_id} showProject={true} />
           ))}
           {todoTasks.length === 0 && (
             <Card className="border-0 shadow-xl rounded-2xl overflow-hidden">
@@ -197,7 +198,7 @@ export function TaskList() {
         {/* Contenido de tareas en progreso */}
         <TabsContent value="in-progress" className="space-y-4">
           {inProgressTasks.map((task) => (
-            <TaskCard key={task.id} task={task} showProject={true} />
+            <TaskCard key={task.id} task_id={task.id} project_id={task.proyecto_id} showProject={true} />
           ))}
           {inProgressTasks.length === 0 && (
             <Card className="border-0 shadow-xl rounded-2xl overflow-hidden">
@@ -223,7 +224,7 @@ export function TaskList() {
         {/* Contenido de tareas completadas */}
         <TabsContent value="completed" className="space-y-4">
           {completedTasks.map((task) => (
-            <TaskCard key={task.id} task={task} showProject={true} />
+            <TaskCard key={task.id} task_id={task.id} project_id={task.proyecto_id} showProject={true} />
           ))}
           {completedTasks.length === 0 && (
             <Card className="border-0 shadow-xl rounded-2xl overflow-hidden">

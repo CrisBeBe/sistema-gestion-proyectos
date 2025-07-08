@@ -1,6 +1,6 @@
 "use client";
 
-import { LoginForm } from "@/components/auth/login-form";
+import LoginForm  from "@/components/auth/login-form";
 import { Dashboard } from "@/components/dashboard/dashboard";
 import { useAuth } from "@/contexts/auth-context";
 

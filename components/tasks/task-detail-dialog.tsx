@@ -18,7 +18,7 @@ import { useApp } from "@/contexts/app-context";
 import { useAuth } from "@/contexts/auth-context";
 import useTask from "@/hooks/use-task";
 import { useToast } from "@/hooks/use-toast";
-import { Commentary, Task, TaskPriority, TaskStatus } from "@/types";
+import { Task, TaskPriority, TaskStatus } from "@/types";
 import { 
   Calendar, 
   MessageSquare, 
@@ -29,31 +29,36 @@ import {
   AlertTriangle,
   User,
   Target,
-  FileText
+  FileText,
+  FileIcon,
+  DownloadIcon
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
 interface TaskDetailDialogProps {
-  task: Task;
+  task_id: number;
+  project_id: number;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
 
 export function TaskDetailDialog({
-  task,
+  task_id,
+  project_id,
   open,
   onOpenChange,
 }: TaskDetailDialogProps) {
   const [newComment, setNewComment] = useState("");
   const [loading, setLoading] = useState(false);
-  const { projects, addComment, deleteTask, updateTask } = useApp();
-  const [comments, setComments] = useState<Commentary[]>([]);
+  const { projects, addComment, deleteTask, updateTask, dowloadFile } = useApp();
   const { token, user } = useAuth();
   const { toast } = useToast();
-  const { assignedTo } = useTask(task.id);
+  const [files, setFiles] = useState<File[]>([]);
 
-  const project = projects.find((p) => p.id === task.proyecto_id);
+  const project = projects.find((p) => p.id === project_id)!;
+  const task = project.tareas.find(t => t.id === task_id)!;
+  const task_files = task.archivos;
 
   const handleAddComment = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,9 +66,11 @@ export function TaskDetailDialog({
 
     setLoading(true);
     try {
-      const comentario = await addComment(task.id, newComment);
-
-      setComments((prev) => [...prev, comentario]);
+      const comentario = await addComment(task.id, {
+        contenido: newComment,
+        archivos: files
+      });
+      
       setNewComment("");
       toast({
         title: "¡Comentario agregado!",
@@ -77,6 +84,7 @@ export function TaskDetailDialog({
       });
     } finally {
       setLoading(false);
+      setFiles([]);
     }
   };
 
@@ -92,7 +100,7 @@ export function TaskDetailDialog({
   };
 
   const handleStatusChange = async (newStatus: TaskStatus) => {
-    await updateTask(task.id, { estado: newStatus });
+    await updateTask(task.id,  newStatus );
     toast({
       title: "¡Estado actualizado!",
       description: "El estado de la tarea ha sido actualizado exitosamente.",
@@ -165,20 +173,6 @@ export function TaskDetailDialog({
   const priorityConfig = getPriorityConfig(task.prioridad);
   const statusConfig = getStatusConfig(task.estado);
 
-  useEffect(() => {
-    const headers: any = {};
-
-    if (token) {
-      headers.authorization = `Bearer ${token}`;
-    }
-
-    fetch(`/api/comentarios?id_tarea=${task.id}`, { headers })
-      .then((res) => res.json())
-      .then((comments) => {
-        setComments(comments);
-      });
-  }, [task]);
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[700px] max-h-[85vh] overflow-hidden bg-white rounded-2xl shadow-2xl border-0 p-0">
@@ -196,7 +190,7 @@ export function TaskDetailDialog({
               </div>
               <DialogDescription className="text-blue-100 flex items-center gap-2">
                 <FileText className="h-4 w-4" />
-                Proyecto: {project?.titulo}
+                Proyecto: {project?.nombre}
               </DialogDescription>
             </div>
             {user?.id === project?.creador_id && (
@@ -249,18 +243,18 @@ export function TaskDetailDialog({
             <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-5 rounded-xl border border-blue-200">
               <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
                 <User className="h-5 w-5 text-blue-600" />
-                Equipo Asignado ({assignedTo.length})
+                Equipo Asignado ({task.asignados.length})
               </h3>
               <div className="flex flex-wrap gap-3">
-                {assignedTo.map((user) => (
+                {task.asignados.map((asignment) => (
                   <div
-                    key={user.id}
+                    key={asignment.id}
                     className="flex items-center gap-3 px-4 py-3 bg-white rounded-xl shadow-sm border border-blue-100 hover:shadow-md transition-shadow"
                   >
                     <div className="h-8 w-8 rounded-xl bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white text-sm font-bold">
-                      {user.nombre.charAt(0).toUpperCase()}
+                      {asignment.usuario.nombre.charAt(0).toUpperCase()}
                     </div>
-                    <span className="text-sm font-medium text-slate-700">{user.nombre}</span>
+                    <span className="text-sm font-medium text-slate-700">{asignment.usuario.nombre}</span>
                   </div>
                 ))}
               </div>
@@ -290,7 +284,7 @@ export function TaskDetailDialog({
             )}
 
             {/* Cambiar estado */}
-            {assignedTo.find((u) => u.id === user?.id) && (
+            {task.asignados.find((a) => a.usuario.id === user?.id) && (
               <div className="bg-gradient-to-r from-purple-50 to-pink-50 p-5 rounded-xl border border-purple-200">
                 <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
                   <Target className="h-5 w-5 text-purple-600" />
@@ -331,6 +325,36 @@ export function TaskDetailDialog({
             )}
           </div>
 
+          {/* Documentos adjuntos */}
+          {task_files.length > 0 && (
+            <div className="bg-gradient-to-r from-slate-50 to-gray-50 p-5 rounded-xl border border-slate-200">
+              <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                <FileText className="h-5 w-5 text-slate-600" />
+                Documentos Adjuntos ({task_files.length})
+              </h3>
+              <ul className="space-y-2 text-sm text-slate-700">
+                {task_files.map((file) => (
+                  <li key={file.id} className="flex items-center justify-between gap-2 bg-white px-4 py-2 rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow">
+                    <div className="flex items-center gap-2 truncate">
+                      <FileIcon className="text-blue-500 h-4 w-4" />
+                      <span className="truncate max-w-[300px]">{file.nombre_original}</span>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => dowloadFile(file.nombre_archivo, file.nombre_original)}
+                      className="text-blue-600 hover:text-blue-800"
+                    >
+                      <DownloadIcon className="h-4 w-4 mr-1" />
+                      Descargar
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+
           <Separator className="my-6" />
 
           {/* Sección de comentarios */}
@@ -340,7 +364,7 @@ export function TaskDetailDialog({
                 <MessageSquare className="h-5 w-5 text-white" />
               </div>
               <h3 className="font-bold text-xl text-slate-800">
-                Comentarios ({comments.length})
+                Comentarios ({task.comentarios.length})
               </h3>
             </div>
 
@@ -352,6 +376,29 @@ export function TaskDetailDialog({
                 onChange={(e) => setNewComment(e.target.value)}
                 className="min-h-[100px] border-slate-300 focus:border-blue-500 focus:ring-blue-500 rounded-xl text-base placeholder-slate-400 resize-none"
               />
+
+              <div>
+                <input
+                  type="file"
+                  multiple
+                  onChange={(e) => {
+                    if (!e.target.files) return;
+                    setFiles(Array.from(e.target.files));
+                  }}
+                  className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                />
+                {files.length > 0 && (
+                  <ul className="text-sm text-slate-600 space-y-1 mt-2">
+                    {files.map((file, index) => (
+                      <li key={index} className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-blue-500" />
+                        <span className="truncate max-w-xs">{file.name}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
               <div className="flex justify-end">
                 <Button
                   type="submit"
@@ -373,19 +420,20 @@ export function TaskDetailDialog({
               </div>
             </form>
 
+
             {/* Lista de comentarios */}
             <div className="space-y-4">
-              {comments.map((comment) => (
+              {task.comentarios.map((comment) => (
                 <Card key={comment.id} className="bg-white border border-slate-200 rounded-xl shadow-sm hover:shadow-md transition-shadow">
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <div className="h-10 w-10 rounded-xl bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white text-sm font-bold">
-                          {comment.user.nombre.charAt(0).toUpperCase()}
+                          {comment.usuario.nombre.charAt(0).toUpperCase()}
                         </div>
                         <div>
                           <span className="font-semibold text-slate-800 text-sm">
-                            {comment.user.email}
+                            {comment.usuario.email}
                           </span>
                           <p className="text-xs text-slate-500">
                             {new Date(comment.fecha_creacion).toLocaleString('es-ES', {
@@ -393,20 +441,50 @@ export function TaskDetailDialog({
                               month: 'short',
                               year: 'numeric',
                               hour: '2-digit',
-                              minute: '2-digit'
+                              minute: '2-digit',
                             })}
                           </p>
                         </div>
                       </div>
                     </div>
                   </CardHeader>
-                  <CardContent className="pt-0">
+                  <CardContent className="pt-0 space-y-2">
                     <p className="text-slate-700 leading-relaxed">{comment.contenido}</p>
+
+                    {/* Archivos adjuntos */}
+                    {comment.archivos.length > 0 && (
+                      <div className="bg-gradient-to-r from-slate-50 to-gray-50 p-5 rounded-xl border border-slate-200">
+                        <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                          <FileText className="h-5 w-5 text-slate-600" />
+                          Documentos Adjuntos ({comment.archivos.length})
+                        </h3>
+                        <ul className="space-y-2 text-sm text-slate-700">
+                          {comment.archivos.map((file) => (
+                            <li key={file.id} className="flex items-center justify-between gap-2 bg-white px-4 py-2 rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow">
+                              <div className="flex items-center gap-2 truncate">
+                                <FileIcon className="text-blue-500 h-4 w-4" />
+                                <span className="truncate max-w-[300px]">{file.nombre_original}</span>
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => dowloadFile(file.nombre_archivo, file.nombre_original)}
+                                className="text-blue-600 hover:text-blue-800"
+                              >
+                                <DownloadIcon className="h-4 w-4 mr-1" />
+                                Descargar
+                              </Button>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
                   </CardContent>
                 </Card>
               ))}
               
-              {comments.length === 0 && (
+              {task.comentarios.length === 0 && (
                 <div className="text-center py-12 bg-gradient-to-r from-slate-50 to-gray-50 rounded-xl border border-slate-200">
                   <MessageSquare className="h-12 w-12 text-slate-400 mx-auto mb-4" />
                   <p className="text-slate-600 font-medium mb-2">¡Inicia la conversación!</p>

@@ -1,161 +1,199 @@
-import db from "@/lib/database";
-import {
-  authenticateUser,
-  createErrorResponse,
-  createResponse,
-} from "@/lib/middleware";
-import { Project, Task } from "@/types";
-import { NextRequest } from "next/server";
+import { type NextRequest, NextResponse } from "next/server"
+import { db } from "@/lib/database"
+import { verifyToken } from "@/lib/jwt"
+import { ok, err, internalServerError } from "@/lib/utils"
+import type { Task, TaskAssignment, Comment } from "@/types"
+import {getTokenFromHeader} from "@/lib/auth"
+import { getProjectTasks } from "../../proyectos/route"
 
-interface Params {
-  params: Promise<{ id: string }>;
+export interface Params {
+  params: Promise<{id: string}>
 }
-
-export async function GET(req: NextRequest, { params }: Params) {
-  const { id } = await params;
+export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const user = authenticateUser(req);
-    if (!user) {
-      return createErrorResponse("Token inválido o expirado", 401);
+    const token = getTokenFromHeader(request)
+    if (!token) {
+      return err("Token requerido", 401)
     }
 
-    const tareaId = parseInt(id);
+    const decoded = verifyToken(token)
+    if (!decoded) {
+      return err("Token inválido", 401)
+    }
 
-    const [tarea] = await db.execute(
+    const taskId = Number.parseInt(params.id)
+
+    // Get task details
+    const [taskRows] = await db.execute(
       `
-      SELECT t.*
+      SELECT t.*, u.nombre as creador_nombre, p.creador_id as proyecto_creador_id
       FROM tareas t
+      LEFT JOIN usuarios u ON t.creador_id = u.id
+      LEFT JOIN proyectos p ON t.proyecto_id = p.id
       WHERE t.id = ?
     `,
-      [tareaId]
-    );
+      [taskId],
+    )
 
-    if ((tarea as any[]).length === 0) {
-      return createErrorResponse("Tarea no encontrada o sin acceso", 404);
+    const task = (taskRows as Task[])[0]
+    if (!task) {
+      return err("Tarea no encontrada", 404)
     }
 
-    // Obtener asignados
-    const [asignados] = await db.execute(
+    // Check if user has access to this task
+    const [accessCheck] = await db.execute(
       `
-      SELECT u.id, u.nombre, u.email
-      FROM usuarios u
-      JOIN usuario_tarea ut ON u.id = ut.usuario_id
-      WHERE ut.tarea_id = ?
+      SELECT 1 FROM tarea_asignaciones ta
+      WHERE ta.tarea_id = ? AND ta.usuario_id = ?
+      UNION
+      SELECT 1 FROM proyectos p
+      WHERE p.id = ? AND p.creador_id = ?
     `,
-      [tareaId]
-    );
+      [taskId, decoded.id, (task as any).proyecto_id, decoded.id],
+    )
 
-    const [proyecto] = await db.execute(
-      "select p.* from proyectos p inner join tareas t on p.id = t.proyecto_id where t.id = ?",
-      [tareaId]
-    );
+    if ((accessCheck as any[]).length === 0) {
+      return err("No tienes acceso a esta tarea", 403)
+    }
 
-    return createResponse({
-      tarea: (tarea as any[])[0],
-      asignados,
-      proyecto: (proyecto as Project[])[0],
-    });
+    // Get task assignments
+    const [assignmentRows] = await db.execute(
+      `
+      SELECT ta.*, u.nombre, u.email
+      FROM tarea_asignaciones ta
+      JOIN usuarios u ON ta.usuario_id = u.id
+      WHERE ta.tarea_id = ?
+    `,
+      [taskId],
+    )
+
+    // Get task files
+    const [fileRows] = await db.execute(
+      `
+      SELECT tf.*, u.nombre as subido_por_nombre
+      FROM tarea_archivos tf
+      JOIN usuarios u ON tf.subido_por = u.id
+      WHERE tf.tarea_id = ?
+      ORDER BY tf.fecha_subida DESC
+    `,
+      [taskId],
+    )
+
+    // Get comments
+    const [commentRows] = await db.execute(
+      `
+      SELECT c.*, u.nombre as usuario_nombre
+      FROM comentarios c
+      JOIN usuarios u ON c.usuario_id = u.id
+      WHERE c.tarea_id = ?
+      ORDER BY c.fecha_creacion ASC
+    `,
+      [taskId],
+    )
+
+    const taskWithDetails = {
+      ...task,
+      asignados: assignmentRows as TaskAssignment[],
+      archivos: fileRows,
+      comentarios: commentRows as Comment[],
+    }
+
+    return NextResponse.json(ok(taskWithDetails))
   } catch (error) {
-    console.error("Error al obtener tarea:", error);
-    return createErrorResponse("Error interno del servidor", 500);
+    console.error("Error obteniendo tarea:", error)
+    return internalServerError()
   }
 }
 
-export async function PUT(req: NextRequest, { params }: Params) {
-  const { id } = await params;
-
+export async function PUT(request: NextRequest, { params }: Params) {
   try {
-    const user = authenticateUser(req);
-    if (!user) {
-      return createErrorResponse("Token inválido o expirado", 401);
+    const {id} = await params;
+    const token = getTokenFromHeader(request)
+    if (!token) {
+      return err("Token requerido", 401)
     }
 
-    const tareaId = parseInt(id);
-    const updates: Partial<Task> = await req.json();
+    const decoded = verifyToken(token)
+    if (!decoded) {
+      return err("Token inválido", 401)
+    }
 
-    // Verificar acceso a la tarea
-    const [access] = await db.execute(
+    const taskId = Number.parseInt(id)
+    const { estado } = await request.json()
+
+    // Check if user has access to modify this task
+    const [accessCheck] = await db.execute(
       `
-      SELECT 1 FROM tareas t
-      LEFT JOIN proyectos p ON t.proyecto_id = p.id
-      LEFT JOIN usuario_proyecto up ON p.id = up.proyecto_id
-      WHERE t.id = ? AND (p.creador_id = ? OR up.usuario_id = ?)
+      SELECT p.creador_id, t.creador_id as tarea_creador_id
+      FROM tareas t
+      JOIN proyectos p ON t.proyecto_id = p.id
+      LEFT JOIN tarea_asignaciones ta ON t.id = ta.tarea_id
+      WHERE t.id = ? AND (p.creador_id = ? OR ta.usuario_id = ?)
     `,
-      [tareaId, user.id, user.id]
-    );
+      [taskId, decoded.id, decoded.id],
+    )
 
-    if ((access as any[]).length === 0) {
-      return createErrorResponse("No tienes acceso a esta tarea", 403);
+    if ((accessCheck as any[]).length === 0) {
+      return err("No tienes acceso para modificar esta tarea", 403)
     }
-
-    const [valoresActuales] = await db.execute(
-      "select * from tareas where id = ?",
-      [tareaId]
-    );
-    const tareaActual = (valoresActuales as Task[])[0];
-    const applyUpdates: Task = {
-      ...tareaActual,
-      ...updates,
-    };
-    const { titulo, descripcion, prioridad, estado, fecha_limite } =
-      applyUpdates;
 
     await db.execute(
-      "UPDATE tareas SET titulo = ?, descripcion = ?, prioridad = ?, estado = ?, fecha_limite = ? WHERE id = ?",
-      [
-        titulo,
-        descripcion || null,
-        prioridad || "media",
-        estado || "pendiente",
-        fecha_limite || null,
-        tareaId,
-      ]
-    );
+      "UPDATE tareas SET estado = ? WHERE id = ?",
+      [estado, taskId],
+    )
 
-    return createResponse(applyUpdates);
+    const [pRS] = await db.execute("select proyecto_id from tareas where id=?", [taskId]);
+    const p = (pRS as any[])[0]
+    
+    const tareas = (await getProjectTasks(p.proyecto_id)).filter(t => t.creador_id === decoded.id || t.asignados.some(a => a.usuario_id === decoded.id));
+
+    return ok(tareas)
   } catch (error) {
-    console.error("Error al actualizar tarea:", error);
-    return createErrorResponse("Error interno del servidor", 500);
+    console.error("Error actualizando tarea:", error)
+    return internalServerError()
   }
 }
 
-export async function DELETE(req: NextRequest, { params }: Params) {
-  const { id } = await params;
+
+export async function DELETE(request: NextRequest, { params }: Params) {
   try {
-    const user = authenticateUser(req);
+    const {id} = await params;
+    const token = getTokenFromHeader(request)
+    if (!token) {
+      return err("Token requerido", 401)
+    }
+
+    const user = verifyToken(token)
     if (!user) {
-      return createErrorResponse("Token inválido o expirado", 401);
+      return err("Token inválido", 401)
     }
 
-    const tareaId = parseInt(id);
+    const taskId = Number.parseInt(id)
 
-    // Verificar que el usuario es el creador de la tarea
-    const [tarea] = await db.execute(
+    // Check if user is project creator (only creator can delete tasks)
+    const [creatorCheck] = await db.execute(
       `
-      SELECT t.creador_id FROM tareas t
-      LEFT JOIN proyectos p ON t.proyecto_id = p.id
-      LEFT JOIN usuario_proyecto up ON p.id = up.proyecto_id
-      WHERE t.id = ? AND (p.creador_id = ? OR up.usuario_id = ?)
+      SELECT *
+      FROM tareas 
+      WHERE id=? and creador_id=?
     `,
-      [tareaId, user.id, user.id]
-    );
+      [taskId, user.id],
+    )
 
-    if ((tarea as any[]).length === 0) {
-      return createErrorResponse("Tarea no encontrada o sin acceso", 404);
+    const task = (creatorCheck as any[])[0]
+    if (!task) {
+      return err("Tarea no encontrada", 404)
     }
 
-    if ((tarea as any[])[0].creador_id !== user.id) {
-      return createErrorResponse(
-        "Solo el creador puede eliminar la tarea",
-        403
-      );
+    if (task.creador_id !== user.id) {
+      return err("Solo el creador del proyecto puede eliminar tareas", 403)
     }
 
-    await db.execute("DELETE FROM tareas WHERE id = ?", [tareaId]);
+    await db.execute("DELETE FROM tareas WHERE id = ?", [taskId])
 
-    return createResponse({ message: "Tarea eliminada exitosamente" });
+    return ok({ message: "Tarea eliminada correctamente" })
   } catch (error) {
-    console.error("Error al eliminar tarea:", error);
-    return createErrorResponse("Error interno del servidor", 500);
+    console.error("Error eliminando tarea:", error)
+    return internalServerError()
   }
 }

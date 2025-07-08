@@ -1,41 +1,41 @@
-import db from "@/lib/database";
-import {
-  authenticateUser,
-  createErrorResponse,
-  createResponse,
-} from "@/lib/middleware";
-import { NextRequest } from "next/server";
+import { type NextRequest, NextResponse } from "next/server"
+import { db } from "@/lib/database"
+import { verifyToken } from "@/lib/jwt"
+import { ok, err, internalServerError } from "@/lib/utils"
+import type { User } from "@/types"
 
-export async function GET(req: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
-    const userId = authenticateUser(req);
-    if (!userId) {
-      return createErrorResponse("Token inválido o expirado", 401);
+    const token = getTokenFromHeader(request)
+    if (!token) {
+      return err("Token requerido", 401)
     }
 
-    const { searchParams } = new URL(req.url);
-    const query = searchParams.get("q");
+    const decoded = verifyToken(token)
+    if (!decoded) {
+      return err("Token inválido", 401)
+    }
+
+    const url = new URL(request.url)
+    const query = url.searchParams.get("q")
 
     if (!query || query.length < 2) {
-      return createErrorResponse(
-        "Query de búsqueda debe tener al menos 2 caracteres",
-        400
-      );
+      return err("La búsqueda debe tener al menos 2 caracteres", 400)
     }
 
-    const [usuarios] = await db.execute(
+    const [rows] = await db.execute(
       `
       SELECT id, nombre, email
       FROM usuarios
       WHERE (nombre LIKE ? OR email LIKE ?) AND id != ?
-      LIMIT 20
+      LIMIT 10
     `,
-      [`%${query}%`, `%${query}%`, userId]
-    );
+      [`%${query}%`, `%${query}%`, decoded.id],
+    )
 
-    return createResponse({ usuarios });
+    return NextResponse.json(ok(rows as User[]))
   } catch (error) {
-    console.error("Error al buscar usuarios:", error);
-    return createErrorResponse("Error interno del servidor", 500);
+    console.error("Error buscando usuarios:", error)
+    return internalServerError()
   }
 }

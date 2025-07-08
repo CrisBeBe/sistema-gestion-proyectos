@@ -5,8 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { useApp } from "@/contexts/app-context";
 import { useAuth } from "@/contexts/auth-context";
-import useTask from "@/hooks/use-task";
-import { Commentary, Task } from "@/types";
+
 import { 
   Calendar, 
   MessageSquare, 
@@ -24,7 +23,8 @@ import { useEffect, useState } from "react";
 import { TaskDetailDialog } from "./task-detail-dialog";
 
 interface TaskCardProps {
-  task: Task;
+  task_id: number;
+  project_id: number;
   showProject?: boolean;
 }
 
@@ -39,15 +39,14 @@ interface TaskCardProps {
 * Usa hooks de contexto para acceder a datos globales de la app, autenticación y actualización de tareas.
 
  */
-export function TaskCard({ task, showProject = false }: TaskCardProps) {
+export function TaskCard({ task_id, project_id, showProject = false }: TaskCardProps) {
   const [showDetail, setShowDetail] = useState(false);
   const { projects, updateTask } = useApp();
   const { token, user } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [comments, setComments] = useState<Commentary[]>([]);
-  const { assignedTo } = useTask(task.id);
 
-  const project = projects.find((p) => p.id === task.proyecto_id);
+  const project = projects.find((p) => p.id === project_id)!;
+  const task = project.tareas.find(t => t.id === task_id)!;
+  const comments = task.comentarios;
 
   const getPriorityConfig = (priority: string) => {
     switch (priority) {
@@ -118,7 +117,7 @@ export function TaskCard({ task, showProject = false }: TaskCardProps) {
   const handleStatusChange = async (
   newStatus: "pendiente" | "en_progreso" | "completada"
 ) => {
-  await updateTask(task.id, { estado: newStatus });
+  await updateTask(task.id, newStatus );
   task.estado = newStatus; 
 };
 
@@ -129,23 +128,6 @@ export function TaskCard({ task, showProject = false }: TaskCardProps) {
 
   const priorityConfig = getPriorityConfig(task.prioridad);
   const statusConfig = getStatusConfig(task.estado);
-
-  useEffect(() => {
-    const headers: any = {};
-
-    if (token) {
-      headers.authorization = `Bearer ${token}`;
-    }
-
-    fetch(`/api/comentarios?id_tarea=${task.id}`, { headers })
-      .then((res) => res.json())
-      .then((comments) => {
-        setComments(comments);
-        setLoading(false);
-      });
-  }, [task]);
-
-  const isAssigned = assignedTo.find((u) => u.id === user?.id);
 
   return (
     <>
@@ -177,20 +159,20 @@ export function TaskCard({ task, showProject = false }: TaskCardProps) {
                 <h3 className="font-bold text-lg leading-tight tracking-tight text-slate-900 truncate">
                   {task.titulo}
                 </h3>
-                {isAssigned && (
+                
                   <div className="flex-shrink-0">
                     <div className="h-6 w-6 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
                       <User className="h-3 w-3 text-white" />
                     </div>
                   </div>
-                )}
+                
               </div>
               
               {showProject && project && (
                 <div className="flex items-center gap-2">
                   <TrendingUp className="h-4 w-4 text-slate-500" />
                   <p className="text-sm font-medium text-slate-600 bg-slate-100 px-2 py-1 rounded-lg">
-                    {project.titulo}
+                    {project.nombre}
                   </p>
                 </div>
               )}
@@ -250,7 +232,7 @@ export function TaskCard({ task, showProject = false }: TaskCardProps) {
             </div>
 
             {/* Botones de acción */}
-            {isAssigned && (
+            
               <div className="flex flex-wrap gap-2">
                 {task.estado !== "pendiente" && (
                   <Button
@@ -297,7 +279,6 @@ export function TaskCard({ task, showProject = false }: TaskCardProps) {
                   </Button>
                 )}
               </div>
-            )}
 
             {/* Indicador de progreso visual */}
             <div className="pt-2">
@@ -335,7 +316,8 @@ export function TaskCard({ task, showProject = false }: TaskCardProps) {
       </Card>
 
       <TaskDetailDialog
-        task={task}
+        task_id={task.id}
+        project_id={task.proyecto_id}
         open={showDetail}
         onOpenChange={setShowDetail}
       />

@@ -1,90 +1,141 @@
-import db from "@/lib/database";
-import {
-  authenticateUser,
-  createErrorResponse,
-  createResponse,
-} from "@/lib/middleware";
-import { NextRequest } from "next/server";
-import type { Invitation, InvitationExtended, User, Project } from "@/types";   
+import { type NextRequest, NextResponse, userAgent } from "next/server"
+import { db } from "@/lib/database"
+import { verifyToken } from "@/lib/jwt"
+import { ok, err, internalServerError } from "@/lib/utils"
+import type { Invitation, APIResponse, InvitationExtended, Project, User} from "@/types"
+import {getTokenFromHeader} from "@/lib/auth"
+import { Response } from "@/types"
 
 
-export async function GET(req: NextRequest) {
+export interface InvitacionesPOSTBody {
+  invitation_id: number;
+  accept: boolean;
+}
+export type InvitacionesGETResponse = Response<InvitationExtended[]>;
+export async function GET(request: NextRequest): APIResponse<InvitationExtended[]> {
   try {
-    const user = authenticateUser(req);
-    if (!user) {
-      return createErrorResponse("Token expirado o inválido.");
+    const token = getTokenFromHeader(request)
+    if (!token) {
+      return err("Token requerido", 401)
     }
 
-    const [consultaInvitaciones] = await db.execute(
-      "select * from invitaciones where destinatario_id=?",
-      [user.id]
-    );
-
-    const invitaciones = consultaInvitaciones as Invitation[];
-
-    const invitacionesExtendidas = new Array<InvitationExtended>();
-
-    for (let invitation of invitaciones) {
-      const [consultaRemitente] = await db.execute(
-        "select id, nombre, email from usuarios where id=?",
-        [invitation.remitente_id]
-      );
-      const [consultaProyecto] = await db.execute(
-        "select * from proyectos where id = ?",
-        [invitation.proyecto_id]
-      );
-
-      invitacionesExtendidas.push({
-        ...invitation,
-        destinatario: user,
-        remitente: (consultaRemitente as User[])[0],
-        proyecto: (consultaProyecto as Project[])[0],
-      });
+    const decoded = verifyToken(token)
+    if (!decoded) {
+      return err("Token inválido", 401)
     }
 
-    return createResponse(invitacionesExtendidas, 200);
+    const [invitationsResultSet] = await db.execute(
+      `
+      SELECT *
+      FROM invitaciones i
+      WHERE i.email = ? AND i.estado = 'pendiente'
+      ORDER BY i.fecha_creacion DESC
+    `,
+      [decoded.email],
+    )
+
+    const invitations = invitationsResultSet as Invitation[];
+    const result: InvitationExtended[] = await Promise.all(invitations.map(async (i) => {
+      const [proyectoRS] = await db.execute("select * from proyectos where id=? limit 1;", [i.proyecto_id])
+      const proyecto = (proyectoRS as Project[])[0];
+
+      const [remitenteRS] = await db.execute("select * from usuarios where id=? limit 1;", [proyecto.creador_id])
+      const remitente = (remitenteRS as User[])[0];
+      return {
+        ...i,
+        remitente,
+        proyecto
+      }
+    }));
+
+    return ok(result)
   } catch (error) {
-    console.error(error);
-
-    return createErrorResponse("Error interno del servidor", 500);
+    console.error("Error obteniendo invitaciones:", error)
+    return internalServerError()
   }
 }
 
-export async function POST(req: NextRequest) {
+export async function POST(request: NextRequest) {
   try {
-    const user = authenticateUser(req);
-    if (!user) {
-      return createErrorResponse("Token expirado o inválido");
+    const token = getTokenFromHeader(request)
+    if (!token) {
+      return err("Token requerido", 401)
     }
 
-    const { id, accept } = await req.json();
-
-    if (accept) {
-      const [consultaInvitation] = await db.execute(
-        "select * from invitaciones where id=?",
-        [id]
-      );
-
-      const invitation = (consultaInvitation as Invitation[])[0];
-
-      const [consultaProyecto] = await db.execute(
-        "select * from proyectos where id=?",
-        [invitation.proyecto_id]
-      );
-
-      const proyecto = (consultaProyecto as Project[])[0];
-
-      await db.execute(
-        "insert into usuario_proyecto(usuario_id, proyecto_id) values(?, ?)",
-        [user.id, proyecto.id]
-      );
+    const decoded = verifyToken(token)
+    if (!decoded) {
+      return err("Token inválido", 401)
     }
 
-    await db.execute("delete from invitaciones where id=?", [id]);
-    return createResponse({ success: true });
+    const { invitation_id, accept }: InvitacionesPOSTBody = await request.json()
+
+    const [invitationRS] = await db.execute("select * from invitaciones where id=?", [invitation_id])
+
+    const invitation = (invitationRS as Invitation[])[0]
+
+
+    await db.execute("insert into proyecto_miembros(proyecto_id, usuario_id, rol) values(?,?,?)",
+      [invitation.proyecto_id, decoded.id, "colaborador"]
+    )
+    await db.execute("update invitaciones set estado = ? where id = ?", [accept ? "aceptada" : "rechazada", invitation_id])
+
+    return ok({})
   } catch (error) {
-    console.log(error);
+    console.error("Error creando invitación:", error)
+    return internalServerError()
+  }
+}
 
-    return createErrorResponse("Error interno del servidor", 500);
+export async function PUT(request: NextRequest) {
+  try {
+    const token = getTokenFromHeader(request)
+    if (!token) {
+      return err("Token requerido", 401)
+    }
+
+    const decoded = verifyToken(token)
+    if (!decoded) {
+      return err("Token inválido", 401)
+    }
+
+    const { invitacion_id, accion } = await request.json()
+
+    if (!invitacion_id || !accion) {
+      return err("ID de invitación y acción son requeridos", 400)
+    }
+
+    if (!["aceptar", "rechazar"].includes(accion)) {
+      return err("Acción inválida", 400)
+    }
+
+    // Get invitation details
+    const [invitationRows] = await db.execute(
+      'SELECT * FROM invitaciones WHERE id = ? AND email = ? AND estado = "pendiente"',
+      [invitacion_id, decoded.email],
+    )
+
+    const invitation = (invitationRows as any[])[0]
+    if (!invitation) {
+      return err("Invitación no encontrada", 404)
+    }
+
+    const newStatus = accion === "aceptar" ? "aceptada" : "rechazada"
+
+    // Update invitation status
+    await db.execute("UPDATE invitaciones SET estado = ? WHERE id = ?", [newStatus, invitacion_id])
+
+    // If accepted, add user to project
+    if (accion === "aceptar") {
+      await db.execute("INSERT INTO proyecto_miembros (proyecto_id, usuario_id, rol) VALUES (?, ?, ?)", [
+        invitation.proyecto_id,
+        decoded.id,
+        "colaborador",
+      ])
+    }
+
+    return NextResponse.json(ok({ message: `Invitación ${newStatus} correctamente` }))
+  } catch (error) {
+    console.error("Error procesando invitación:", error)
+    return internalServerError()
   }
 }

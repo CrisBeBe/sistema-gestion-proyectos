@@ -51,8 +51,9 @@ export function Dashboard() {
     null
   );
   const { user, logout, token } = useAuth();
-  const { projects, tasks, invitations, respondInvitation } = useApp();
+  const { projects, invitations, respondInvitation, createProject } = useApp();
 
+  const tasks = projects.map(p => p.tareas).flat();
   const pendingTasks = tasks.filter((t) => t.estado !== "completada");
   const completedTasks = tasks.filter((t) => t.estado === "completada");
   const overdueTasks = tasks.filter(
@@ -109,7 +110,7 @@ export function Dashboard() {
                   </div>
                 </div>
                 <div className="relative">
-                  <CreateProjectDialog />
+                  <CreateProjectDialog  createProject={createProject}/>
                 </div>
               </div>
               <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-16 translate-x-16"></div>
@@ -239,7 +240,7 @@ export function Dashboard() {
                                 index === 1 ? 'bg-blue-500' : 'bg-purple-500'
                               }`}></div>
                               <h3 className="font-semibold text-slate-900 group-hover:text-blue-700 transition-colors">
-                                {project.titulo}
+                                {project.nombre}
                               </h3>
                             </div>
                             <p className="text-sm text-slate-600 mb-3 line-clamp-2">
@@ -248,7 +249,7 @@ export function Dashboard() {
                             <div className="flex items-center gap-4 text-xs text-slate-500">
                               <div className="flex items-center gap-1">
                                 <Calendar className="h-3 w-3" />
-                                <span>Actualizado: {project.fecha_actualizacion}</span>
+                                <span>Creado: {new Date(project.fecha_creacion).toLocaleString()}</span>
                               </div>
                             </div>
                           </div>
@@ -268,7 +269,7 @@ export function Dashboard() {
                         <p className="text-slate-500 mb-4">
                           No tienes proyectos aún
                         </p>
-                        <CreateProjectDialog />
+                        <CreateProjectDialog createProject={createProject}/>
                       </div>
                     )}
                   </div>
@@ -362,12 +363,14 @@ export function Dashboard() {
   };
 
   useEffect(() => {
+    console.log("iiiii");
+    
     if (!token || invitations.length === 0) return;
 
     let invitation = invitations[0];
 
     const accept = confirm(
-      `Usted ha sido invitado por ${invitation.remitente.nombre} (${invitation.remitente.email}) para formar parte del proyecto '${invitation.proyecto.titulo}'.\n¿Desea aceptar la invitación?`
+      `Usted ha sido invitado por ${invitation.remitente.nombre} (${invitation.remitente.email}) para formar parte del proyecto '${invitation.proyecto.nombre}'.\n¿Desea aceptar la invitación?`
     );
 
     respondInvitation(invitation, accept);
