@@ -29,7 +29,7 @@ export async function POST(request: NextRequest, { params }: Params): APIRespons
         const tarea_id = parseInt(id);
 
         // Verificar que la tarea exista
-        const [tareaRS] = await db.execute("SELECT * FROM tareas t inner join tarea_asignaciones ta on ta.tarea_id = t.id WHERE t.id = ? and ta.usuario_id = ?", [tarea_id, user.id]);
+        const [tareaRS] = await db.execute("SELECT * FROM tareas t inner join tarea_asignaciones ta on ta.tarea_id = t.id WHERE t.id = ? and (ta.usuario_id = ? or t.creador_id=?)", [tarea_id, user.id, user.id]);
         if ((tareaRS as any[]).length === 0) {
             return err("La tarea no existe o no tienes acceso a ella", 403);
         }
